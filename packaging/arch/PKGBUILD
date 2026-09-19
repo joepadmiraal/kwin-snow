@@ -1,5 +1,5 @@
 pkgname=kwin-effect-snow
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='Native KWin effect that renders falling snow on windows and panels'
 arch=('x86_64')

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(kwin-effect-snow VERSION 0.1.0 LANGUAGES CXX)
+project(kwin-effect-snow VERSION 0.2.0 LANGUAGES CXX)
 
 set(SNOW_PACKAGE_VERSION "${PROJECT_VERSION}" CACHE STRING "Version used for distributable packages")
 set(CPACK_PACKAGE_NAME "kwin-effect-snow")
