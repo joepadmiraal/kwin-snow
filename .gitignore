@@ -1,1 +1,25 @@
-build/
+# CMake/build directories
+/build/
+/build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+Testing/
+_deps/
+
+# Packaging artifacts
+/dist/
+/*.deb
+/*.rpm
+/packaging/arch/src/
+/packaging/arch/pkg/
+/packaging/arch/*.pkg.tar.*
+/packaging/arch/*.tar.gz
+/packaging/arch/*.src.tar.*
+
+# Editor/OS noise
+.directory
+.DS_Store
+*.swp
