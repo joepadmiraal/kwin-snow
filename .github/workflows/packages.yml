@@ -119,8 +119,11 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           mkdir -p packaging/arch/src
-          git archive --format=tar.gz --prefix="kwin-effect-snow-${version}/" HEAD \
-            -o "packaging/arch/kwin-effect-snow-${version}.tar.gz"
+          tar --exclude='./.git' --exclude='./packaging/arch/src' \
+            --transform="s,^\./,kwin-effect-snow-${version}/," \
+            -czf "/tmp/kwin-effect-snow-${version}.tar.gz" .
+          mv "/tmp/kwin-effect-snow-${version}.tar.gz" \
+            "packaging/arch/kwin-effect-snow-${version}.tar.gz"
           sed -i "s/^pkgver=.*/pkgver=${version}/" packaging/arch/PKGBUILD
 
       - name: Build and verify Arch package

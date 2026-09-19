@@ -77,6 +77,43 @@ void SnowEffect::reconfigure(ReconfigureFlags)
     qCDebug(KWIN_EFFECT_SNOW).noquote() << "Snow reconfigured --" << describeSettings(m_settings);
 }
 
+namespace
+{
+
+std::chrono::milliseconds monotonicMilliseconds()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(Snow::FramePacer::Clock::now().time_since_epoch());
+}
+
+template<typename EffectsHandler>
+void chainPrePaintScreen(EffectsHandler *handler, KWin::ScreenPrePaintData &data,
+                         std::chrono::milliseconds presentTime)
+{
+    if constexpr (requires(EffectsHandler *h, KWin::ScreenPrePaintData &d, std::chrono::milliseconds t) {
+                      h->prePaintScreen(d, t);
+                  }) {
+        handler->prePaintScreen(data, presentTime);
+    } else {
+        handler->prePaintScreen(data);
+    }
+}
+
+template<typename EffectsHandler>
+void chainPrePaintWindow(EffectsHandler *handler, KWin::RenderView *view, KWin::EffectWindow *window,
+                         KWin::WindowPrePaintData &data, std::chrono::milliseconds presentTime)
+{
+    if constexpr (requires(EffectsHandler *h, KWin::RenderView *v, KWin::EffectWindow *w,
+                           KWin::WindowPrePaintData &d, std::chrono::milliseconds t) {
+                      h->prePaintWindow(v, w, d, t);
+                  }) {
+        handler->prePaintWindow(view, window, data, presentTime);
+    } else {
+        handler->prePaintWindow(view, window, data);
+    }
+}
+
+} // namespace
+
 void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::milliseconds presentTime)
 {
     // Which output this frame is for, for the Caps drawn inside it and for the
@@ -100,7 +137,7 @@ void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::mil
         // repaints them. That is the trail a dragged window pulls behind it,
         // and not stepping here is what there is instead of asking for the
         // whole screen to be repainted at somebody else's frame rate.
-        KWin::effects->prePaintScreen(data, presentTime);
+        chainPrePaintScreen(KWin::effects, data, presentTime);
         return;
     }
 
@@ -128,7 +165,12 @@ void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::mil
     // makes a frame the snow rides along with as complete as one of its own.
     data.paint += data.screen->geometry();
 
-    KWin::effects->prePaintScreen(data, presentTime);
+    chainPrePaintScreen(KWin::effects, data, presentTime);
+}
+
+void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data)
+{
+    prePaintScreen(data, monotonicMilliseconds());
 }
 
 void SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
@@ -173,7 +215,12 @@ void SnowEffect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w,
         data.devicePaint += view->mapToDeviceCoordinatesAligned(strip);
     }
 
-    KWin::effects->prePaintWindow(view, w, data, presentTime);
+    chainPrePaintWindow(KWin::effects, view, w, data, presentTime);
+}
+
+void SnowEffect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data)
+{
+    prePaintWindow(view, w, data, monotonicMilliseconds());
 }
 
 void SnowEffect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
