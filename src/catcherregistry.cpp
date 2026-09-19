@@ -191,6 +191,10 @@ void CatcherRegistry::settle(KWin::LogicalOutput *output, qreal delta, const Set
 
 void CatcherRegistry::addOutput(KWin::LogicalOutput *output)
 {
+    if (m_grounds.contains(output)) {
+        return;
+    }
+
     connect(output, &KWin::LogicalOutput::geometryChanged, this, [this, output] {
         outputGeometryChanged(output);
     });

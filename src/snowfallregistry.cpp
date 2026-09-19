@@ -49,6 +49,10 @@ SnowfallRegistry::~SnowfallRegistry() = default;
 
 void SnowfallRegistry::addOutput(KWin::LogicalOutput *output)
 {
+    if (m_outputs.contains(output)) {
+        return;
+    }
+
     connect(output, &KWin::LogicalOutput::geometryChanged, this, [this, output] {
         outputGeometryChanged(output);
     });
