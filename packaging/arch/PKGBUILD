@@ -5,7 +5,7 @@ pkgdesc='Native KWin effect that renders falling snow on windows and panels'
 arch=('x86_64')
 license=('GPL-2.0-or-later')
 depends=('kwin' 'qt6-base' 'kconfig' 'kcoreaddons' 'kconfigwidgets' 'ki18n' 'kcmutils')
-makedepends=('cmake' 'ninja' 'gcc' 'extra-cmake-modules' 'qt6-declarative')
+makedepends=('cmake' 'ninja' 'gcc' 'extra-cmake-modules' 'qt6-declarative' 'vulkan-headers')
 source=("kwin-effect-snow-${pkgver}.tar.gz")
 sha256sums=('SKIP')
 

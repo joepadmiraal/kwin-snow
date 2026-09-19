@@ -112,7 +112,7 @@ jobs:
       - name: Install build dependencies
         run: |
           pacman -Syu --noconfirm --needed \
-            git cmake ninja extra-cmake-modules qt6-base qt6-declarative kwin \
+            git cmake ninja extra-cmake-modules qt6-base qt6-declarative vulkan-headers kwin \
             kconfig kcoreaddons kconfigwidgets ki18n kcmutils
 
       - name: Create tagged source archive

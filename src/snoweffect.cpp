@@ -198,21 +198,13 @@ void SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin:
 void SnowEffect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w,
                                 KWin::WindowPrePaintData &data, std::chrono::milliseconds presentTime)
 {
-    if (const Catcher *catcher = cappedCatcher(w)) {
-        // The Cap rises above the window's frame geometry, into a strip nothing
-        // else has any reason to repaint. Saying so is what stops it being
-        // culled; saying the window is translucent is what stops the strip
-        // being treated as opaque window (spec: Rendering).
-        // Against the snow that is standing, not against the configured cap:
-        // a `maxDepth` that has just come down leaves Caps deeper than it for
-        // a few seconds, and a strip cut to the new cap would take the top off
-        // them (cap.h: capReferenceDepth).
-        const qreal headroom = capHeadroom(capReferenceDepth(catcher->snowline(), m_settings.maxDepth));
-        const QRectF strip(catcher->geometry().left(), catcher->geometry().top() - headroom,
-                           catcher->geometry().width(), headroom);
-
+    if (cappedCatcher(w)) {
+        // KWin's current WindowPrePaintData no longer exposes a usable region
+        // for extending the window's repaint above its frame. The full-output
+        // repaint requested by the frame clock keeps the Cap visible; marking
+        // the window translucent still prevents it from being treated as an
+        // opaque occluder (see ADR-0005).
         data.setTranslucent();
-        data.devicePaint += view->mapToDeviceCoordinatesAligned(strip);
     }
 
     chainPrePaintWindow(KWin::effects, view, w, data, presentTime);
