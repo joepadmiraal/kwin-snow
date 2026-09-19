@@ -1,0 +1,160 @@
+name: Release packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  deb:
+    name: Ubuntu 26.04 amd64
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+            build-essential cmake ninja-build pkg-config dpkg-dev file \
+            extra-cmake-modules qt6-base-dev qt6-declarative-dev \
+            libkf6config-dev libkf6configwidgets-dev libkf6coreaddons-dev \
+            libkf6i18n-dev libkf6kcmutils-dev libkf6windowsystem-dev kwin-dev
+
+      - name: Configure and build package
+        run: |
+          cmake -B build-tests -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build-tests --parallel
+          ctest --test-dir build-tests --output-on-failure
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DSNOW_PACKAGE_VERSION="${GITHUB_REF_NAME#v}" \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DSNOW_QT_PLUGIN_DIR=/usr/lib/x86_64-linux-gnu/qt6/plugins \
+            -DBUILD_TESTING=OFF
+          cmake --build build --parallel
+          cpack --config build/CPackConfig.cmake -G DEB
+
+      - name: Verify package contents
+        run: |
+          deb="$(find . -maxdepth 1 -name '*.deb' -print -quit)"
+          test -n "$deb"
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb" | grep -F '/usr/lib/x86_64-linux-gnu/qt6/plugins/kwin/effects/plugins/snow.so'
+          dpkg-deb --contents "$deb" | grep -F '/usr/lib/x86_64-linux-gnu/qt6/plugins/kwin/effects/configs/kwin_snow_config.so'
+          install -D "$deb" "dist/kwin-effect-snow-${GITHUB_REF_NAME#v}-ubuntu-26.04-amd64.deb"
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-26.04-amd64
+          path: dist/*.deb
+          if-no-files-found: error
+
+  rpm:
+    name: Fedora KDE 44 x86_64
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            cmake ninja-build gcc-c++ rpm-build file \
+            extra-cmake-modules qt6-qtbase-devel qt6-qtdeclarative-devel \
+            kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcoreaddons-devel \
+            kf6-ki18n-devel kf6-kcmutils-devel kf6-kwindowsystem-devel kwin-devel
+
+      - name: Configure and build package
+        run: |
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DSNOW_PACKAGE_VERSION="${GITHUB_REF_NAME#v}" \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DSNOW_QT_PLUGIN_DIR=/usr/lib64/qt6/plugins \
+            -DBUILD_TESTING=OFF
+          cmake --build build --parallel
+          cpack --config build/CPackConfig.cmake -G RPM
+
+      - name: Verify package contents
+        run: |
+          rpm_file="$(find . -maxdepth 1 -name '*.rpm' -print -quit)"
+          test -n "$rpm_file"
+          rpm -qip "$rpm_file"
+          rpm -qlp "$rpm_file" | grep -Fx '/usr/lib64/qt6/plugins/kwin/effects/plugins/snow.so'
+          rpm -qlp "$rpm_file" | grep -Fx '/usr/lib64/qt6/plugins/kwin/effects/configs/kwin_snow_config.so'
+          install -D "$rpm_file" "dist/kwin-effect-snow-${GITHUB_REF_NAME#v}-fedora-44-x86_64.rpm"
+
+      - name: Upload RPM package
+        uses: actions/upload-artifact@v4
+        with:
+          name: fedora-44-x86_64
+          path: dist/*.rpm
+          if-no-files-found: error
+
+  arch:
+    name: Arch Linux x86_64
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm --needed \
+            cmake ninja extra-cmake-modules qt6-base qt6-declarative kwin \
+            kconfig6 kcoreaddons kconfigwidgets ki18n kcmutils
+
+      - name: Create tagged source archive
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p packaging/arch/src
+          git archive --format=tar.gz --prefix="kwin-effect-snow-${version}/" HEAD \
+            -o "packaging/arch/kwin-effect-snow-${version}.tar.gz"
+          sed -i "s/^pkgver=.*/pkgver=${version}/" packaging/arch/PKGBUILD
+
+      - name: Build and verify Arch package
+        run: |
+          cd packaging/arch
+          useradd -m builder
+          chown -R builder:builder .
+          su builder -c 'makepkg --clean --syncdeps --noconfirm'
+          package="$(find . -maxdepth 1 -name '*.pkg.tar.zst' -print -quit)"
+          test -n "$package"
+          pacman -Qip "$package"
+          pacman -Qlp "$package" | grep -Fx 'kwin-effect-snow /usr/lib/qt6/plugins/kwin/effects/plugins/snow.so'
+          pacman -Qlp "$package" | grep -Fx 'kwin-effect-snow /usr/lib/qt6/plugins/kwin/effects/configs/kwin_snow_config.so'
+          mkdir -p ../../dist
+          install -D "$package" "../../dist/kwin-effect-snow-${GITHUB_REF_NAME#v}-arch-x86_64.pkg.tar.zst"
+
+      - name: Upload Arch package
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-x86_64
+          path: dist/*.pkg.tar.zst
+          if-no-files-found: error
+
+  release:
+    name: Attach packages to GitHub Release
+    needs: [deb, rpm, arch]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          path: dist
+          merge-multiple: true
+
+      - name: Attach packages
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

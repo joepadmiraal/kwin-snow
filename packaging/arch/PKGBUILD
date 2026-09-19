@@ -1,0 +1,28 @@
+pkgname=kwin-effect-snow
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Native KWin effect that renders falling snow on windows and panels'
+arch=('x86_64')
+license=('GPL-2.0-or-later')
+depends=('kwin' 'qt6-base' 'kconfig6' 'kcoreaddons' 'kconfigwidgets' 'ki18n' 'kcmutils')
+makedepends=('cmake' 'ninja' 'gcc' 'extra-cmake-modules' 'qt6-declarative')
+source=("kwin-effect-snow-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+# The release workflow creates this archive from the exact version tag. For an
+# AUR publication, replace the local archive with the project's tagged source
+# URL and set a real checksum. KWin has no stable native-effect ABI, so this
+# package must be rebuilt whenever Arch updates KWin.
+build() {
+    cmake -B build -S "${srcdir}/kwin-effect-snow-${pkgver}" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DSNOW_PACKAGE_VERSION="${pkgver}" \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DSNOW_QT_PLUGIN_DIR=/usr/lib/qt6/plugins \
+        -DBUILD_TESTING=OFF
+    cmake --build build
+}
+
+package() {
+    DESTDIR="${pkgdir}" cmake --install build
+}

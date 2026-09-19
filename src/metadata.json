@@ -1,0 +1,19 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "joep@groovytunes.nl",
+                "Name": "Joep Admiraal"
+            }
+        ],
+        "Category": "Appearance",
+        "Description": "Falling snow that settles on the top edges of windows and panels",
+        "EnabledByDefault": false,
+        "Icon": "preferences-system-windows-effect-snow",
+        "License": "GPL-2.0-or-later",
+        "Name": "Snow"
+    },
+    "X-KDE-ConfigModule": "kwin_snow_config",
+    "X-KDE-PluginInfo-Name": "snow",
+    "X-KDE-Ordering": 60
+}

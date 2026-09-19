@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    SPDX-FileCopyrightText: 2026 Joep Admiraal <joep@groovytunes.nl>
+    SPDX-License-Identifier: GPL-2.0-or-later
+
+    The effect's knobs, as the two tables in .scratch/snow-effect/spec.md state
+    them. The group is [Effect-snow] because the effect is named `snow`, which
+    under KF6 is the basename of its plugin file; see
+    docs/adr/0004-effect-identity-is-the-plugin-filename.md.
+
+    Every default here is also a default in Snow::Settings (src/settings.h),
+    which is what the simulation actually reads and what the tests work from.
+    The two have to agree and nothing in the toolchain makes them, because the
+    schema is where a KCM's "Defaults" button reads from and the struct is where
+    everything else reads from; tests/settingstest.cpp is what checks it.
+
+    The ranges are the spec's where the spec states one, and guards against a
+    hand-edited kwinrc where it does not: KConfigXT clamps on read, which is the
+    one place a nonsense value can be stopped before the simulation sees it.
+-->
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+                          http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <!-- The KConfig object is handed in rather than opened by name: the effect
+       passes KWin's own kwinrc, which is the object KWin reparses before it
+       calls reconfigure(). See Snow::configuredSettings(). -->
+  <kcfgfile arg="true"/>
+
+  <group name="Effect-snow">
+    <!-- Basic: what it looks like. -->
+
+    <entry name="snowOnWindows" type="Bool">
+      <default>true</default>
+    </entry>
+
+    <entry name="snowOnPanels" type="Bool">
+      <default>true</default>
+    </entry>
+
+    <entry name="snowOnDesktop" type="Bool">
+      <default>true</default>
+    </entry>
+
+    <!-- The choice names are what is written to kwinrc, so they are spelled
+         the way the spec spells them rather than the way C++ would. -->
+    <entry name="flakeStyle" type="Enum">
+      <choices>
+        <choice name="blob"/>
+        <choice name="crystal"/>
+        <choice name="depth"/>
+      </choices>
+      <default>depth</default>
+    </entry>
+
+    <entry name="capStyle" type="Enum">
+      <choices>
+        <choice name="shaded"/>
+        <choice name="contour"/>
+      </choices>
+      <default>contour</default>
+    </entry>
+
+    <entry name="density" type="Int">
+      <default>5</default>
+      <min>1</min>
+      <max>10</max>
+    </entry>
+
+    <!-- Advanced: how it behaves. -->
+
+    <entry name="fallSpeed" type="Int">
+      <default>5</default>
+      <min>1</min>
+      <max>10</max>
+    </entry>
+
+    <entry name="windStrength" type="Int">
+      <default>4</default>
+      <min>0</min>
+      <max>10</max>
+    </entry>
+
+    <!-- What a gust blows past the side edge of a Catcher does: fall on in
+         front of the window, or go behind it until it comes out below. It is
+         only whether such a Flake is drawn: neither setting changes where the
+         snow lands, or how much of it there is. See
+         Snow::Settings::flakesInFrontOfWindows. -->
+    <entry name="flakesInFrontOfWindows" type="Bool">
+      <default>true</default>
+    </entry>
+
+    <!-- Logical pixels, never device ones (ADR-0001). -->
+    <entry name="maxDepth" type="Int">
+      <default>20</default>
+      <min>1</min>
+      <max>200</max>
+    </entry>
+
+    <!-- Logical pixels a second; 0 is permanent accumulation. Under the rate
+         snow arrives at, which is what makes it accumulate at all rather than
+         melt as fast as it lands; see Snow::Settings::meltRate. -->
+    <entry name="meltRate" type="Double">
+      <default>0.05</default>
+      <min>0</min>
+      <max>100</max>
+    </entry>
+
+    <!-- The upper bound is the one Snow::frameInterval() clamps to, which is
+         past the fastest display anyone has and so reads as "no cap". -->
+    <entry name="frameRateCap" type="Int">
+      <default>30</default>
+      <min>1</min>
+      <max>240</max>
+    </entry>
+  </group>
+</kcfg>

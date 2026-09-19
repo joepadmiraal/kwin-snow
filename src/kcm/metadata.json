@@ -1,0 +1,7 @@
+{
+    "KPlugin": {
+        "Description": "Falling snow that settles on the top edges of windows and panels",
+        "Icon": "preferences-system-windows-effect-snow",
+        "Name": "Snow"
+    }
+}

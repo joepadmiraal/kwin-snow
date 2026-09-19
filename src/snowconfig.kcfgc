@@ -1,0 +1,8 @@
+File=snowconfig.kcfg
+ClassName=SnowConfig
+NameSpace=Snow
+Singleton=true
+# Read-only from the effect's side: the effect never writes a key, the KCM
+# does. Mutators are here because ticket 10's config module binds to the same
+# schema and needs them.
+Mutators=true
