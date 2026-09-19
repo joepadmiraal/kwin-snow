@@ -132,7 +132,7 @@ jobs:
           useradd -m builder
           chown -R builder:builder .
           su builder -c 'makepkg --clean --syncdeps --noconfirm'
-          package="$(find . -maxdepth 1 -name '*.pkg.tar.zst' -print -quit)"
+          package="$(find . -maxdepth 1 -name 'kwin-effect-snow-[0-9]*.pkg.tar.zst' -print -quit)"
           test -n "$package"
           pacman -Qip "$package"
           pacman -Qlp "$package" | grep -Fx 'kwin-effect-snow /usr/lib/qt6/plugins/kwin/effects/plugins/snow.so'
