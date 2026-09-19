@@ -21,10 +21,13 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
-            build-essential cmake ninja-build pkg-config dpkg-dev file \
+            build-essential cmake ninja-build pkg-config \
+            libdrm-dev libwayland-dev wayland-protocols dpkg-dev file \
             extra-cmake-modules qt6-base-dev qt6-declarative-dev \
             libkf6config-dev libkf6configwidgets-dev libkf6coreaddons-dev \
             libkf6i18n-dev libkf6kcmutils-dev libkf6windowsystem-dev kwin-dev
+          command -v pkg-config
+          pkg-config --modversion libdrm
 
       - name: Configure and build package
         run: |

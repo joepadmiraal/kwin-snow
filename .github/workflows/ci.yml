@@ -20,13 +20,16 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
-            cmake ninja-build g++ \
+            cmake ninja-build g++ pkg-config \
+            libdrm-dev libwayland-dev wayland-protocols \
             extra-cmake-modules \
             qt6-base-dev qt6-declarative-dev \
             libkf6config-dev libkf6configwidgets-dev \
             libkf6coreaddons-dev libkf6i18n-dev \
             libkf6kcmutils-dev libkf6windowsystem-dev \
             kwin-dev
+          command -v pkg-config
+          pkg-config --modversion libdrm
 
       - name: Configure
         run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug
