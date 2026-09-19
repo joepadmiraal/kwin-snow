@@ -70,7 +70,7 @@ jobs:
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             cmake ninja-build gcc-c++ rpm-build file \
-            libepoxy-devel \
+            libdrm-devel libepoxy-devel \
             extra-cmake-modules qt6-qtbase-devel qt6-qtdeclarative-devel \
             kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcoreaddons-devel \
             kf6-ki18n-devel kf6-kcmutils-devel kf6-kwindowsystem-devel kwin-devel
@@ -112,15 +112,18 @@ jobs:
       - name: Install build dependencies
         run: |
           pacman -Syu --noconfirm --needed \
-            cmake ninja extra-cmake-modules qt6-base qt6-declarative kwin \
+            git cmake ninja extra-cmake-modules qt6-base qt6-declarative vulkan-headers kwin \
             kconfig kcoreaddons kconfigwidgets ki18n kcmutils
 
       - name: Create tagged source archive
         run: |
           version="${GITHUB_REF_NAME#v}"
           mkdir -p packaging/arch/src
-          git archive --format=tar.gz --prefix="kwin-effect-snow-${version}/" HEAD \
-            -o "packaging/arch/kwin-effect-snow-${version}.tar.gz"
+          tar --exclude='./.git' --exclude='./packaging/arch/src' \
+            --transform="s,^\./,kwin-effect-snow-${version}/," \
+            -czf "/tmp/kwin-effect-snow-${version}.tar.gz" .
+          mv "/tmp/kwin-effect-snow-${version}.tar.gz" \
+            "packaging/arch/kwin-effect-snow-${version}.tar.gz"
           sed -i "s/^pkgver=.*/pkgver=${version}/" packaging/arch/PKGBUILD
 
       - name: Build and verify Arch package
@@ -129,7 +132,7 @@ jobs:
           useradd -m builder
           chown -R builder:builder .
           su builder -c 'makepkg --clean --syncdeps --noconfirm'
-          package="$(find . -maxdepth 1 -name '*.pkg.tar.zst' -print -quit)"
+          package="$(find . -maxdepth 1 -name 'kwin-effect-snow-[0-9]*.pkg.tar.zst' -print -quit)"
           test -n "$package"
           pacman -Qip "$package"
           pacman -Qlp "$package" | grep -Fx 'kwin-effect-snow /usr/lib/qt6/plugins/kwin/effects/plugins/snow.so'

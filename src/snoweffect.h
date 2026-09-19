@@ -81,7 +81,10 @@ public:
      * runs, so the snow resumes exactly where it stopped however long ago that
      * was.
      */
-    void prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::milliseconds presentTime) override;
+    // KWin 6.6 passes presentTime; newer KWin releases do not. Keep both
+    // overloads so the effect builds against either API generation.
+    void prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::milliseconds presentTime);
+    void prePaintScreen(KWin::ScreenPrePaintData &data);
 
     /**
      * Draws the Flakes of the output being painted, over everything else.
@@ -103,7 +106,8 @@ public:
      * (spec: Rendering).
      */
     void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data,
-                        std::chrono::milliseconds presentTime) override;
+                        std::chrono::milliseconds presentTime);
+    void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data);
 
     /**
      * Draws the Cap of the window being painted, over the window itself.
