@@ -50,6 +50,12 @@ void applySchemaRange(Widget *widget, const QString &key)
 {
     const KConfigSkeletonItem *item = SnowConfig::self()->findItem(key);
     Q_ASSERT(item);
+    if (!item) {
+        // A key that does not match the schema, in a build where the assert
+        // above does not stop us: leave the widget at its default bounds
+        // rather than dereferencing a null item.
+        return;
+    }
 
     using Bound = decltype(widget->minimum());
     widget->setMinimum(item->minValue().value<Bound>());
