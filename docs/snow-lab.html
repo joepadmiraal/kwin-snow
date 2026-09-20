@@ -1,0 +1,742 @@
+<title>KWin Snow Lab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #fbfcfd;
+    --surface: #ffffff;
+    --surface-sunk: #f0f3f6;
+    --line: #dae1e7;
+    --line-strong: #c3ced7;
+    --ink: #1b2429;
+    --ink-soft: #5d6b73;
+    --ink-faint: #8b979f;
+    --accent: #2b90c4;
+    --accent-ink: #ffffff;
+    --accent-wash: #e3f1f9;
+    --warn: #b5810a;
+    --snow: #f4f8fb;
+    --shadow: 0 1px 2px rgba(27,36,41,.06), 0 8px 24px -12px rgba(27,36,41,.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #16191b;
+      --surface: #1e2225;
+      --surface-sunk: #14171a;
+      --line: #2e353a;
+      --line-strong: #414a51;
+      --ink: #e8edf0;
+      --ink-soft: #9aa7af;
+      --ink-faint: #6d7b84;
+      --accent: #56b8e6;
+      --accent-ink: #0d1114;
+      --accent-wash: #1a2c36;
+      --warn: #e0ad3c;
+      --snow: #f4f8fb;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #16191b;
+    --surface: #1e2225;
+    --surface-sunk: #14171a;
+    --line: #2e353a;
+    --line-strong: #414a51;
+    --ink: #e8edf0;
+    --ink-soft: #9aa7af;
+    --ink-faint: #6d7b84;
+    --accent: #56b8e6;
+    --accent-ink: #0d1114;
+    --accent-wash: #1a2c36;
+    --warn: #e0ad3c;
+    --snow: #f4f8fb;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 32px 64px;
+  }
+
+  header.masthead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 4px; }
+  h1 {
+    font-size: clamp(24px, 4vw, 33px);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .lede { color: var(--ink-soft); max-width: 62ch; margin: 10px 0 26px; }
+
+  .stage {
+    position: relative;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    overflow: hidden;
+    background: #11161b;
+    box-shadow: var(--shadow);
+    line-height: 0;
+  }
+  .stage canvas { display: block; width: 100%; height: auto; }
+  .readout {
+    position: absolute;
+    top: 10px; right: 10px;
+    display: flex; gap: 14px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    background: rgba(12,17,21,.72);
+    color: #cfdae2;
+    padding: 5px 10px;
+    border-radius: 4px;
+    line-height: 1.4;
+    backdrop-filter: blur(6px);
+    font-variant-numeric: tabular-nums;
+  }
+  .readout b { color: #fff; font-weight: 500; }
+  .readout .cap { color: var(--warn); }
+
+  .bench {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    gap: 20px;
+    margin-top: 22px;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 16px 16px 18px;
+  }
+  .panel h2 {
+    font-size: 11px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 12px;
+    font-weight: 500;
+  }
+
+  .choices { display: flex; flex-direction: column; gap: 6px; }
+  .choice {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    align-items: start;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--surface-sunk);
+    cursor: pointer;
+    transition: border-color .12s, background .12s;
+  }
+  .choice:hover { border-color: var(--line-strong); }
+  .choice input { margin: 4px 0 0; accent-color: var(--accent); }
+  .choice .nm { font-weight: 500; font-size: 14px; }
+  .choice .ds { grid-column: 2; color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; }
+  .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-wash); }
+  .choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .rec {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent); border: 1px solid currentColor; border-radius: 3px;
+    padding: 0 4px; margin-left: 7px; vertical-align: 1.5px; white-space: nowrap;
+  }
+
+  .toggles { display: flex; flex-direction: column; gap: 9px; }
+  .tog { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
+  .tog input { accent-color: var(--accent); width: 16px; height: 16px; }
+  .tog code {
+    margin-left: auto;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px; color: var(--ink-faint);
+  }
+
+  .slider { margin-bottom: 15px; }
+  .slider:last-child { margin-bottom: 0; }
+  .slider .row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 3px; }
+  .slider label { font-size: 13.5px; }
+  .slider .val {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums;
+  }
+  .slider input[type=range] { width: 100%; accent-color: var(--accent); }
+  .slider .hint { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  button {
+    font: inherit; font-size: 13.5px;
+    padding: 7px 14px;
+    border-radius: 5px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  button.primary:hover { color: var(--accent-ink); filter: brightness(1.08); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .note {
+    margin-top: 26px;
+    border-left: 2px solid var(--accent);
+    padding: 2px 0 2px 14px;
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    max-width: 68ch;
+  }
+  .note strong { color: var(--ink); font-weight: 500; }
+  @media (prefers-reduced-motion: reduce) { .choice { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <h1>KWin Snow Lab</h1>
+    <span class="eyebrow">Q16 · visual direction</span>
+  </header>
+  <p class="lede">
+    The agreed algorithm, running in a canvas: per-catcher column arrays in local coordinates,
+    solid catchers hit-tested topmost-first, caps drawn in each window's own pass so stacking
+    handles occlusion, flakes in one pass above everything. Flake style and cap style both ship as
+    user-facing settings, so what's left to pick here is which of them should be the default.
+  </p>
+
+  <div class="stage">
+    <canvas id="stage" width="1600" height="1000" aria-label="Simulated Plasma desktop with falling snow accumulating on window and panel top edges"></canvas>
+    <div class="readout">
+      <span>flakes <b id="r-count">—</b></span>
+      <span>fps <b id="r-fps">—</b></span>
+      <span class="cap" id="r-cap">30 fps cap</span>
+    </div>
+  </div>
+
+  <div class="bench">
+    <section class="panel">
+      <h2>Flake style</h2>
+      <div class="choices" id="flakeStyles">
+        <label class="choice">
+          <input type="radio" name="flake" value="blob" id="flake-blob">
+          <span class="nm">Soft blob</span>
+          <span class="ds">Radial falloff, one uniform size. Cheapest, reads cleanly, looks like every other snow effect.</span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="flake" value="crystal" id="flake-crystal">
+          <span class="nm">Six-point crystal</span>
+          <span class="ds">Rotating procedural sprite with branches. Prettiest up close; turns to noise below about 4&nbsp;px.</span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="flake" value="depth" id="flake-depth" checked>
+          <span class="nm">Depth-cued blobs<span class="rec">Suggested</span></span>
+          <span class="ds">Size, opacity and fall speed all scale with a per-flake z. The parallax is what actually sells falling snow.</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Cap style</h2>
+      <div class="choices" id="capStyles">
+        <label class="choice">
+          <input type="radio" name="cap" value="shadow" id="cap-shadow">
+          <span class="nm">Shaded band</span>
+          <span class="ds">Smooth top contour with a soft blue shadow under the leading edge, so the pile reads as volume rather than a white stripe.</span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="cap" value="contour" id="cap-contour" checked>
+          <span class="nm">Settled contour<span class="rec">Suggested</span></span>
+          <span class="ds">Irregular top edge from per-column noise, plus the shadow. Looks settled rather than extruded.</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Catchers</h2>
+      <div class="toggles">
+        <label class="tog"><input type="checkbox" id="c-windows" checked> Snow on windows <code>snowOnWindows</code></label>
+        <label class="tog"><input type="checkbox" id="c-panels" checked> Snow on panels <code>snowOnPanels</code></label>
+        <label class="tog"><input type="checkbox" id="c-desktop" checked> Snow on desktop <code>snowOnDesktop</code></label>
+        <label class="tog"><input type="checkbox" id="c-inset" checked> Corner inset ramp <code>Q10</code></label>
+        <label class="tog"><input type="checkbox" id="c-fpscap" checked> Cap animation at 30 fps <code>Q14</code></label>
+      </div>
+      <div class="actions">
+        <button class="primary" id="btn-clear">Clear snow</button>
+        <button id="btn-fill">Fast-forward 60 s</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Simulation knobs</h2>
+      <div class="slider">
+        <div class="row"><label for="s-density">Density</label><span class="val" id="v-density">5</span></div>
+        <input type="range" id="s-density" min="1" max="10" step="1" value="5">
+        <div class="hint">Flakes per unit screen area, so it holds at 1080p and 4K alike.</div>
+      </div>
+      <div class="slider">
+        <div class="row"><label for="s-speed">Fall speed</label><span class="val" id="v-speed">5</span></div>
+        <input type="range" id="s-speed" min="1" max="10" step="1" value="5">
+      </div>
+      <div class="slider">
+        <div class="row"><label for="s-wind">Wind</label><span class="val" id="v-wind">4</span></div>
+        <input type="range" id="s-wind" min="0" max="10" step="1" value="4">
+        <div class="hint">Noise-driven gusts with per-flake response, not a constant drift.</div>
+      </div>
+      <div class="slider">
+        <div class="row"><label for="s-depth">Max depth</label><span class="val" id="v-depth">14 px</span></div>
+        <input type="range" id="s-depth" min="3" max="40" step="1" value="14">
+      </div>
+      <div class="slider">
+        <div class="row"><label for="s-melt">Melt rate</label><span class="val" id="v-melt">0.4 px/s</span></div>
+        <input type="range" id="s-melt" min="0" max="30" step="1" value="4">
+        <div class="hint">0 = permanent accumulation. Anything above it reaches a steady state against snowfall.</div>
+      </div>
+    </section>
+  </div>
+
+  <p class="note">
+    <strong>Drag a window</strong> in the stage to check the Q8 rule: the Snowline travels with it, because
+    depths are stored in the window's own local columns. <strong>Turn off "snow on windows"</strong> and the
+    windows stop being solid — flakes fall straight past them to the panel and the ground, which is the whole
+    of the mode you asked for in Q2.
+  </p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var cv = document.getElementById("stage");
+  var ctx = cv.getContext("2d");
+  var W = cv.width, H = cv.height;
+  var COLW = 5;
+
+  var cfg = {
+    flake: "depth", cap: "contour",
+    windows: true, panels: true, desktop: true, inset: true, fpscap: true,
+    density: 5, speed: 5, wind: 4, maxDepth: 14, melt: 0.4
+  };
+
+  // ---- Catchers: bottom-to-top paint order. Hit-tested in reverse. ----
+  function makeCatcher(kind, x, y, w, h, title) {
+    var c = { kind: kind, x: x, y: y, w: w, h: h, title: title };
+    c.ncols = Math.max(1, Math.ceil(w / COLW));
+    c.cols = new Float32Array(c.ncols);
+    c.noise = new Float32Array(c.ncols);
+    for (var i = 0; i < c.ncols; i++) c.noise[i] = Math.random();
+    return c;
+  }
+
+  var ground = makeCatcher("ground", 0, H, W, 0, null);
+  var windows = [
+    makeCatcher("window", 90, 300, 620, 520, "Dolphin — Pictures"),
+    makeCatcher("window", 470, 200, 700, 620, "Konsole"),
+    makeCatcher("window", 880, 380, 620, 440, "kwin_snow.cpp — Kate")
+  ];
+  var panel = makeCatcher("panel", 210, 880, 1180, 62, null);
+  function allCatchers() { return [ground].concat(windows, [panel]); }
+  function enabled(c) {
+    if (c.kind === "window") return cfg.windows;
+    if (c.kind === "panel") return cfg.panels;
+    return cfg.desktop;
+  }
+
+  // ---- Flakes ----
+  var flakes = [];
+  function spawn(atTop) {
+    return {
+      x: Math.random() * (W + 200) - 100,
+      y: atTop ? -20 - Math.random() * 200 : Math.random() * H,
+      py: 0,
+      z: Math.random(),
+      r: 2.6 + Math.random() * 2.4,
+      sway: 0.5 + Math.random() * 1.5,
+      swayF: 0.6 + Math.random() * 1.1,
+      phase: Math.random() * 6.283,
+      resp: Math.random(),
+      rot: Math.random() * 6.283,
+      rotv: (Math.random() - 0.5) * 1.2
+    };
+  }
+  function targetCount() { return Math.round(cfg.density * 95); }
+
+  // ---- Pre-rendered sprites ----
+  function blobSprite() {
+    var s = document.createElement("canvas"); s.width = s.height = 32;
+    var g = s.getContext("2d");
+    var rg = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    rg.addColorStop(0, "rgba(255,255,255,1)");
+    rg.addColorStop(0.45, "rgba(244,248,251,0.85)");
+    rg.addColorStop(1, "rgba(244,248,251,0)");
+    g.fillStyle = rg; g.fillRect(0, 0, 32, 32);
+    return s;
+  }
+  function crystalSprite() {
+    var s = document.createElement("canvas"); s.width = s.height = 48;
+    var g = s.getContext("2d");
+    g.translate(24, 24);
+    g.strokeStyle = "rgba(255,255,255,0.95)";
+    g.lineCap = "round";
+    for (var a = 0; a < 6; a++) {
+      g.save(); g.rotate(a * Math.PI / 3);
+      g.lineWidth = 2.6; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -19); g.stroke();
+      g.lineWidth = 1.8;
+      [-13, -8].forEach(function (d) {
+        g.beginPath(); g.moveTo(0, d); g.lineTo(5.5, d - 5.5); g.stroke();
+        g.beginPath(); g.moveTo(0, d); g.lineTo(-5.5, d - 5.5); g.stroke();
+      });
+      g.restore();
+    }
+    return s;
+  }
+  var SPR_BLOB = blobSprite(), SPR_CRYSTAL = crystalSprite();
+
+  // ---- Deposition ----
+  function deposit(c, x, amount) {
+    var i = Math.floor((x - c.x) / COLW);
+    if (i < 0 || i >= c.ncols) return;
+    c.cols[i] = Math.min(cfg.maxDepth, c.cols[i] + amount * 0.62);
+    if (i > 0) c.cols[i - 1] = Math.min(cfg.maxDepth, c.cols[i - 1] + amount * 0.19);
+    if (i < c.ncols - 1) c.cols[i + 1] = Math.min(cfg.maxDepth, c.cols[i + 1] + amount * 0.19);
+  }
+  // Angle of repose: relax spikes toward neighbours so piles settle.
+  function relax(c) {
+    var n = c.ncols, col = c.cols;
+    for (var i = 1; i < n - 1; i++) {
+      var l = col[i - 1], r = col[i + 1], m = col[i];
+      if (m - l > 1.6) { var t = (m - l) * 0.16; col[i] -= t; col[i - 1] += t; }
+      if (m - r > 1.6) { var t2 = (m - r) * 0.16; col[i] -= t2; col[i + 1] += t2; }
+    }
+  }
+  function insetFactor(c, i) {
+    if (!cfg.inset || c.kind === "ground") return 1;
+    var ramp = 4;
+    if (i < ramp) return (i + 0.5) / ramp;
+    if (i >= c.ncols - ramp) return (c.ncols - i - 0.5) / ramp;
+    return 1;
+  }
+
+  // ---- Step ----
+  function gust(t) {
+    return (Math.sin(t * 0.31) + Math.sin(t * 0.13 + 2.1) * 0.6 + Math.sin(t * 0.07 + 4.3) * 0.4) / 2;
+  }
+
+  function step(dt, t) {
+    var want = targetCount();
+    while (flakes.length < want) flakes.push(spawn(flakes.length > 40));
+    while (flakes.length > want) flakes.pop();
+
+    var g = gust(t) * cfg.wind * 26;
+    var base = 40 + cfg.speed * 34;
+    var useZ = cfg.flake === "depth";
+    var order = allCatchers();
+
+    for (var k = 0; k < flakes.length; k++) {
+      var f = flakes[k];
+      f.py = f.y;
+      var zf = useZ ? (0.45 + 0.9 * f.z) : 1;
+      f.y += base * zf * dt;
+      f.x += (g * (0.55 + 0.9 * f.resp) + Math.sin(t * f.swayF + f.phase) * f.sway * 12) * dt;
+      f.rot += f.rotv * dt;
+
+      if (f.x < -110) f.x += W + 220;
+      if (f.x > W + 110) f.x -= W + 220;
+
+      var landed = false;
+      for (var ci = order.length - 1; ci >= 0; ci--) {
+        var c = order[ci];
+        if (!enabled(c)) continue;
+        if (f.x < c.x || f.x >= c.x + c.w) continue;
+        var i = Math.floor((f.x - c.x) / COLW);
+        if (i < 0 || i >= c.ncols) continue;
+        var surf = c.y - c.cols[i] * insetFactor(c, i);
+        if (f.py <= surf && f.y >= surf) {
+          deposit(c, f.x, useZ ? (0.5 + f.z) * 0.9 : 1.0);
+          landed = true;
+          break;
+        }
+      }
+      if (landed || f.y > H + 30) {
+        var ns = spawn(true);
+        for (var p in ns) f[p] = ns[p];
+      }
+    }
+
+    for (var ci2 = 0; ci2 < order.length; ci2++) {
+      var cc = order[ci2];
+      relax(cc);
+      if (cfg.melt > 0) {
+        var d = cfg.melt * dt;
+        for (var j = 0; j < cc.ncols; j++) cc.cols[j] = Math.max(0, cc.cols[j] - d);
+      }
+    }
+  }
+
+  // ---- Cap rendering ----
+  function capPath(c) {
+    var pts = [];
+    for (var i = 0; i < c.ncols; i++) {
+      var d = c.cols[i] * insetFactor(c, i);
+      if (cfg.cap === "contour") d *= 0.72 + c.noise[i] * 0.46;
+      pts.push([c.x + i * COLW + COLW / 2, c.y - d]);
+    }
+    return pts;
+  }
+  function drawCap(c) {
+    var any = false;
+    for (var i = 0; i < c.ncols; i++) if (c.cols[i] > 0.15) { any = true; break; }
+    if (!any) return;
+    var pts = capPath(c);
+    var bottom = c.kind === "ground" ? H : c.y + 3;
+
+    ctx.beginPath();
+    ctx.moveTo(c.x, bottom);
+    ctx.lineTo(pts[0][0], pts[0][1]);
+    for (var p = 1; p < pts.length; p++) {
+      var mx = (pts[p - 1][0] + pts[p][0]) / 2, my = (pts[p - 1][1] + pts[p][1]) / 2;
+      ctx.quadraticCurveTo(pts[p - 1][0], pts[p - 1][1], mx, my);
+    }
+    ctx.lineTo(c.x + c.w, bottom);
+    ctx.closePath();
+    ctx.fillStyle = "#f4f8fb";
+    ctx.fill();
+
+    {
+      ctx.save();
+      ctx.clip();
+      var top = c.y - cfg.maxDepth - 6;
+      var sg = ctx.createLinearGradient(0, top, 0, top + cfg.maxDepth + 14);
+      sg.addColorStop(0, "rgba(154,186,209,0)");
+      sg.addColorStop(0.55, "rgba(139,173,199,0.30)");
+      sg.addColorStop(1, "rgba(108,146,176,0.55)");
+      ctx.fillStyle = sg;
+      ctx.fillRect(c.x, top, c.w, cfg.maxDepth + 16);
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (var q = 1; q < pts.length; q++) {
+        var mx2 = (pts[q - 1][0] + pts[q][0]) / 2, my2 = (pts[q - 1][1] + pts[q][1]) / 2;
+        ctx.quadraticCurveTo(pts[q - 1][0], pts[q - 1][1], mx2, my2);
+      }
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+    }
+  }
+
+  // ---- Desktop chrome ----
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function drawWallpaper() {
+    var g = ctx.createLinearGradient(0, 0, W * 0.4, H);
+    g.addColorStop(0, "#1d3247");
+    g.addColorStop(0.5, "#16283a");
+    g.addColorStop(1, "#101c29");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = "rgba(255,255,255,0.028)";
+    ctx.lineWidth = 1;
+    for (var i = -8; i < 26; i++) {
+      ctx.beginPath(); ctx.moveTo(i * 90, 0); ctx.lineTo(i * 90 + 420, H); ctx.stroke();
+    }
+  }
+  function drawWindow(c) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 34; ctx.shadowOffsetY = 12;
+    roundRect(c.x, c.y, c.w, c.h, 9);
+    ctx.fillStyle = "#2b3033"; ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    roundRect(c.x, c.y, c.w, c.h, 9); ctx.clip();
+    ctx.fillStyle = "#31373b"; ctx.fillRect(c.x, c.y, c.w, 40);
+    ctx.fillStyle = "#1f2426"; ctx.fillRect(c.x, c.y + 40, c.w, c.h - 40);
+    ctx.fillStyle = "#c6d0d6";
+    ctx.font = "500 17px 'IBM Plex Sans', sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.fillText(c.title, c.x + 16, c.y + 21);
+    ["#6f787d", "#6f787d", "#8a5a5a"].forEach(function (col, n) {
+      ctx.fillStyle = col; ctx.beginPath();
+      ctx.arc(c.x + c.w - 26 - n * 26, c.y + 20, 5.5, 0, 6.283); ctx.fill();
+    });
+    ctx.fillStyle = "rgba(255,255,255,0.075)";
+    for (var r = 0; r < 9; r++) {
+      var lw = (c.w - 60) * (0.35 + ((r * 37) % 60) / 100);
+      ctx.fillRect(c.x + 24, c.y + 70 + r * 26, lw, 9);
+    }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,0.09)"; ctx.lineWidth = 1;
+    roundRect(c.x + .5, c.y + .5, c.w - 1, c.h - 1, 9); ctx.stroke();
+  }
+  function drawPanel(c) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 6;
+    roundRect(c.x, c.y, c.w, c.h, 7);
+    ctx.fillStyle = "rgba(40,46,50,0.94)"; ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    for (var i = 0; i < 7; i++) roundRect(c.x + 18 + i * 52, c.y + 15, 34, 32, 5), ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.font = "500 16px 'IBM Plex Mono', monospace";
+    ctx.textBaseline = "middle";
+    ctx.fillText("21:04", c.x + c.w - 74, c.y + 31);
+  }
+
+  function drawFlakes() {
+    var useZ = cfg.flake === "depth";
+    var spr = cfg.flake === "crystal" ? SPR_CRYSTAL : SPR_BLOB;
+    for (var i = 0; i < flakes.length; i++) {
+      var f = flakes[i];
+      var r = useZ ? f.r * (0.55 + 1.0 * f.z) : f.r;
+      var a = useZ ? (0.3 + 0.7 * f.z) : 0.9;
+      var s = r * (cfg.flake === "crystal" ? 3.4 : 4.2);
+      ctx.globalAlpha = a;
+      if (cfg.flake === "crystal") {
+        ctx.save();
+        ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+        ctx.drawImage(spr, -s / 2, -s / 2, s, s);
+        ctx.restore();
+      } else {
+        ctx.drawImage(spr, f.x - s / 2, f.y - s / 2, s, s);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function render() {
+    drawWallpaper();
+    if (cfg.desktop) drawCap(ground);
+    for (var i = 0; i < windows.length; i++) {
+      drawWindow(windows[i]);
+      if (cfg.windows) drawCap(windows[i]);
+    }
+    drawPanel(panel);
+    if (cfg.panels) drawCap(panel);
+    drawFlakes();
+  }
+
+  // ---- Loop ----
+  var last = performance.now(), acc = 0, fpsT = last, fpsN = 0, simT = 0;
+  var rCount = document.getElementById("r-count");
+  var rFps = document.getElementById("r-fps");
+  var rCap = document.getElementById("r-cap");
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (cfg.fpscap) {
+      acc += dt;
+      if (acc < 1 / 30) return;
+      dt = acc; acc = 0;
+    }
+    simT += dt;
+    step(dt, simT);
+    render();
+    fpsN++;
+    if (now - fpsT > 500) {
+      rFps.textContent = Math.round(fpsN * 1000 / (now - fpsT));
+      rCount.textContent = flakes.length;
+      fpsT = now; fpsN = 0;
+    }
+  }
+
+  // ---- Controls ----
+  function bindRadios(name, key) {
+    document.querySelectorAll('input[name="' + name + '"]').forEach(function (el) {
+      el.addEventListener("change", function () { if (el.checked) cfg[key] = el.value; });
+    });
+  }
+  bindRadios("flake", "flake");
+  bindRadios("cap", "cap");
+
+  [["c-windows", "windows"], ["c-panels", "panels"], ["c-desktop", "desktop"],
+   ["c-inset", "inset"], ["c-fpscap", "fpscap"]].forEach(function (p) {
+    var el = document.getElementById(p[0]);
+    el.addEventListener("change", function () {
+      cfg[p[1]] = el.checked;
+      if (p[1] === "fpscap") rCap.textContent = el.checked ? "30 fps cap" : "uncapped";
+    });
+  });
+
+  function bindSlider(id, vid, key, fmt, scale) {
+    var el = document.getElementById(id), out = document.getElementById(vid);
+    function upd() {
+      var v = parseFloat(el.value);
+      cfg[key] = scale ? scale(v) : v;
+      out.textContent = fmt(cfg[key], v);
+    }
+    el.addEventListener("input", upd); upd();
+  }
+  bindSlider("s-density", "v-density", "density", function (v) { return v; });
+  bindSlider("s-speed", "v-speed", "speed", function (v) { return v; });
+  bindSlider("s-wind", "v-wind", "wind", function (v) { return v; });
+  bindSlider("s-depth", "v-depth", "maxDepth", function (v) { return v + " px"; });
+  bindSlider("s-melt", "v-melt", "melt", function (v) { return v.toFixed(1) + " px/s"; }, function (v) { return v / 10; });
+
+  document.getElementById("btn-clear").addEventListener("click", function () {
+    allCatchers().forEach(function (c) { c.cols.fill(0); });
+  });
+  document.getElementById("btn-fill").addEventListener("click", function () {
+    for (var i = 0; i < 1800; i++) { simT += 1 / 30; step(1 / 30, simT); }
+  });
+
+  // ---- Drag windows (proves the Q8 travel rule) ----
+  var drag = null;
+  function pos(e) {
+    var r = cv.getBoundingClientRect();
+    var pt = e.touches ? e.touches[0] : e;
+    return { x: (pt.clientX - r.left) * (W / r.width), y: (pt.clientY - r.top) * (H / r.height) };
+  }
+  function down(e) {
+    var p = pos(e);
+    for (var i = windows.length - 1; i >= 0; i--) {
+      var c = windows[i];
+      if (p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y - 20 && p.y <= c.y + 40) {
+        drag = { c: c, dx: p.x - c.x, dy: p.y - c.y };
+        windows.splice(i, 1); windows.push(c);
+        e.preventDefault();
+        return;
+      }
+    }
+  }
+  function move(e) {
+    if (!drag) return;
+    var p = pos(e);
+    drag.c.x = Math.max(-80, Math.min(W - 60, p.x - drag.dx));
+    drag.c.y = Math.max(30, Math.min(H - 90, p.y - drag.dy));
+    e.preventDefault();
+  }
+  function up() { drag = null; }
+  cv.addEventListener("mousedown", down); window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+  cv.addEventListener("touchstart", down, { passive: false });
+  window.addEventListener("touchmove", move, { passive: false });
+  window.addEventListener("touchend", up);
+  cv.style.cursor = "grab";
+
+  for (var i = 0; i < targetCount(); i++) flakes.push(spawn(false));
+  for (var w = 0; w < 900; w++) { simT += 1 / 30; step(1 / 30, simT); }
+  requestAnimationFrame(frame);
+})();
+</script>
