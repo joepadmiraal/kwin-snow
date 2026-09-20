@@ -132,7 +132,7 @@ struct Settings
      * that has stopped being fed goes, over the minutes rather than the
      * seconds that meltRateFor() below is for.
      */
-    qreal meltRate = 0.04;
+    qreal meltRate = 0.2;
 
     /**
      * How many frames a second the snow is animated at.

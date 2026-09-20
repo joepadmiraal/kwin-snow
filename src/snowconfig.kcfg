@@ -101,7 +101,7 @@
          snow arrives at, which is what makes it accumulate at all rather than
          melt as fast as it lands; see Snow::Settings::meltRate. -->
     <entry name="meltRate" type="Double">
-      <default>0.04</default>
+      <default>0.2</default>
       <min>0</min>
       <max>100</max>
     </entry>
