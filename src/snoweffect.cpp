@@ -98,6 +98,28 @@ void chainPrePaintScreen(EffectsHandler *handler, KWin::ScreenPrePaintData &data
     }
 }
 
+/**
+ * What a frame painted with @a mask over @a deviceRegion may actually put on
+ * screen.
+ *
+ * Normally that is the region itself: KWin repaints what has changed since the
+ * buffer it is drawing into was last shown, and everything outside it is
+ * already right in that buffer and must be left alone (FlakePainter's scissor
+ * is where what happens otherwise is written down).
+ *
+ * A transformed screen -- Overview and the like -- is not painted through the
+ * damage region at all, and the region KWin hands over then says nothing about
+ * where the output ends up on screen. The whole render target is the honest
+ * answer there, and clipping to it is the no-op it should be.
+ */
+KWin::Region paintRegion(const KWin::RenderViewport &viewport, int mask, const KWin::Region &deviceRegion)
+{
+    if (mask & KWin::Scene::PAINT_SCREEN_TRANSFORMED) {
+        return KWin::Region(viewport.deviceRect());
+    }
+    return deviceRegion;
+}
+
 template<typename EffectsHandler>
 void chainPrePaintWindow(EffectsHandler *handler, KWin::RenderView *view, KWin::EffectWindow *window,
                          KWin::WindowPrePaintData &data, std::chrono::milliseconds presentTime)
@@ -120,7 +142,16 @@ void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::mil
     // schedule it belongs to: neither paintWindow nor postPaintScreen is told.
     m_paintedOutput = data.screen;
 
-    if (!m_frameClock->isDue(data.screen, FramePacer::Clock::now())) {
+    // Asked once, because asking is claiming (FrameClock::isDue), and handed to
+    // the probe so that a frame the snow did not move in can be told apart from
+    // one it was never given.
+    m_translucentWindows = 0;
+    m_groundCapDrawn = false;
+
+    const bool due = m_frameClock->isDue(data.screen, FramePacer::Clock::now());
+    m_probe.beginFrame(data.screen, due, presentTime, m_settings.frameRateCap);
+
+    if (!due) {
         // Not a frame the snow moves in, for either of two reasons.
         //
         // The clock is stopped: a suspension that leaves the snow on screen,
@@ -147,6 +178,7 @@ void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::mil
         // piece of that repaint a frame like this still owes.
         data.paint += capHeadroomRegion(data.screen);
 
+        m_probe.requested(data.paint);
         chainPrePaintScreen(KWin::effects, data, presentTime);
         return;
     }
@@ -168,6 +200,10 @@ void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::mil
     // spike standing for a frame before it settles.
     m_catchers->settle(data.screen, delta, m_settings);
 
+    // Everything above this line is the simulation, and everything the frame
+    // costs after it is the repaint the line below asks for.
+    m_probe.simulated();
+
     // The snow has moved, so the whole output has to be repainted for it: a
     // Flake can be anywhere, and the pixels it was drawn in last frame are
     // nowhere anything else reports as damaged. This is the same full repaint
@@ -175,6 +211,7 @@ void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::mil
     // makes a frame the snow rides along with as complete as one of its own.
     data.paint += data.screen->geometry();
 
+    m_probe.requested(data.paint);
     chainPrePaintScreen(KWin::effects, data, presentTime);
 }
 
@@ -190,6 +227,16 @@ void SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin:
     // which is not told which output it is painting; prePaintScreen kept it.
     m_groundCapPending = true;
 
+    // What this frame may put on screen, which every draw below clips itself
+    // to. Kept rather than passed because the Caps go down inside the call
+    // below, and paintWindow is handed a region of the window's own.
+    m_paintedRegion = paintRegion(viewport, mask, deviceRegion);
+
+    // What KWin settled on repainting, which is neither what the effect asked
+    // for in prePaintScreen nor in the same coordinates -- and is what both
+    // painters scissor to, a draw per rect of it.
+    m_probe.painted(m_paintedRegion);
+
     // Everything else first: the Flakes go over the whole window stack, and an
     // enabled Catcher class is Solid, so no Flake is ever behind a window to
     // begin with (ADR-0003). The Caps are drawn from inside this call, each in
@@ -198,10 +245,10 @@ void SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin:
 
     // The Flakes of this output and no others. A Flake belongs to one Snowfall
     // for the whole of its life and never crosses to another (spec: Rendering),
-    // so there is nothing here to clip.
+    // so there is nothing here to clip by output.
     if (Snowfall *snowfall = m_snowfalls->snowfallFor(screen)) {
         m_flakePainter->paint(renderTarget, viewport, snowfall->flakes(),
-                              m_settings.flakeStyle);
+                              m_settings.flakeStyle, m_paintedRegion);
     }
 }
 
@@ -209,6 +256,8 @@ void SnowEffect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w,
                                 KWin::WindowPrePaintData &data, std::chrono::milliseconds presentTime)
 {
     if (cappedCatcher(w)) {
+        ++m_translucentWindows;
+
         // KWin's current WindowPrePaintData no longer exposes a usable region
         // for extending the window's repaint above its frame. The full-output
         // repaint requested by the frame clock keeps the Cap visible; marking
@@ -240,7 +289,9 @@ void SnowEffect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin:
     if (m_groundCapPending && w->isDesktop()) {
         m_groundCapPending = false;
         if (const Catcher *ground = cappedGround()) {
-            m_capPainter->paint(renderTarget, viewport, viewport.projectionMatrix(), *ground, m_settings, 1.0);
+            m_groundCapDrawn = true;
+            m_capPainter->paint(renderTarget, viewport, viewport.projectionMatrix(), *ground, m_settings, 1.0,
+                                m_paintedRegion);
         }
     }
 
@@ -251,7 +302,7 @@ void SnowEffect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin:
         // Cap along with a window some effect below is moving or fading.
         m_capPainter->paint(renderTarget, viewport,
                             viewport.projectionMatrix() * data.toMatrix(viewport.scale()),
-                            *catcher, m_settings, data.opacity());
+                            *catcher, m_settings, data.opacity(), m_paintedRegion);
     }
 }
 
@@ -318,6 +369,8 @@ void SnowEffect::postPaintScreen()
     // (FramePacer) and how a desktop painting faster than the cap for its own
     // reasons costs the effect fewer frames of its own.
     m_frameClock->frameRendered(m_paintedOutput, FramePacer::Clock::now());
+    m_probe.marked(m_translucentWindows, m_groundCapDrawn);
+    m_probe.endFrame();
 
     KWin::effects->postPaintScreen();
 }

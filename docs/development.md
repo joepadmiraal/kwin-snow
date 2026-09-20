@@ -406,3 +406,74 @@ Live-session logs go to the journal:
 ```sh
 journalctl --user -f -o cat | grep -i snow
 ```
+
+### Watching frames
+
+A stutter is three different faults wearing the same coat, and telling them
+apart is what `src/frameprobe.h` is for. Set `KWIN_SNOW_PROBE` in the
+compositor's environment and the effect writes down what every frame did,
+reporting the ones that stand out as they happen and summing the rest up once a
+second:
+
+```
+kwin.effect.snow: Snow probe eDP-1 -- no frame for 216.7 ms (13.0 refreshes);
+    snow stood still for 216.7 ms of a 33.3 ms step; frame 2.1 ms (sim 0.4 ms),
+    repaint 2.30 logical Mpx asked in 1 rect, painted in 1 rect, 2 translucent
+    + ground Cap, stepped
+kwin.effect.snow: Snow probe eDP-1 -- translucent windows 2 -> 3
+kwin.effect.snow: Snow probe eDP-1 1.00 s -- 60 frames, 30 stepped,
+    1 reported; frame 3.9 ms worst, 1.4 ms mean; sim 0.9 ms worst; widest
+    present gap 216.7 ms, widest step gap 216.7 ms; repainted 69.4 logical
+    Mpx, painted in 1 rect median, 6 worst; translucent 2..3, ground Cap in
+    30 frames
+```
+
+Each line is a handful of numbers, and which of them is wrong says whose fault
+it is:
+
+- **the present gap** — how far apart two consecutive frames of an output are,
+  judged against the pacing interval rather than against a refresh period: when
+  nothing else is painting the desktop, a frame every interval is all there is
+  to expect. Wider than that means the compositor produced no frame when one was
+  asked for, so nothing on screen moved and the snow is only the most visible
+  thing that did not. The cause is outside this effect, though it may still be
+  this effect's repaints that cost the time.
+- **the step gap** — how far apart two frames the snow *moved* in are. Wide
+  while the present gap stays at a refresh period means frames were produced and
+  the snow was not stepped in them, which is `FrameClock`'s to answer for.
+- **the translucent count** — how many windows the effect took out of the
+  occluders by marking them translucent, which is its one lever on a frame that
+  no repaint region records: a window that is not an occluder is one whose
+  neighbours below it are painted whole rather than culled. A peak in KWin's own
+  `Paint Amount` that lines up with a change here comes from here; one that does
+  not, does not.
+- **the frame time**, and the slice of it the simulation took. Over a refresh
+  period is a frame that cannot be delivered on time whatever the schedule says;
+  if `sim` is not most of it then the cost is in what the frame asked to be
+  repainted rather than in the snow.
+- **the painted rect count** — how many rectangles the region KWin settled on
+  repainting is made of, which is a different number from the one in the same
+  line's `asked` clause: that one is what the effect put in `data.paint`, in
+  logical pixels, before KWin unioned it with everybody else's damage. Both
+  painters scissor to the painted region and issue a draw per rect of it, so
+  the Flakes cost eight draws a rect and every Cap one more. A frame that
+  repaints the whole output is a single rect and is the cheapest of them in
+  this one respect. The summary prints `32+` when the median falls in the
+  histogram's overflow bucket (32 or more rects); the worst count stays exact.
+
+`KWIN_SNOW_PROBE` is read once, when the effect is loaded, so it goes where the
+session already picks environment up — the same directory `install-live.sh`
+writes `QT_PLUGIN_PATH` into:
+
+```sh
+echo 'export KWIN_SNOW_PROBE=1' > ~/.config/plasma-workspace/env/kwin-snow-probe.sh
+chmod +x ~/.config/plasma-workspace/env/kwin-snow-probe.sh
+```
+
+Then log out and back in, which a rebuilt `snow.so` needs anyway — KWin keeps
+the shared object mapped, so unloading and loading the effect does not pick up
+new code. Read it with `journalctl --user -f | grep "Snow probe"`. Delete the
+file and log in again to turn it off.
+
+**Do not measure this nested.** A nested compositor does not reach the frame cap
+to begin with, so every number above is its host's rather than a display's.

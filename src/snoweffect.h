@@ -5,9 +5,11 @@
 
 #pragma once
 
+#include "frameprobe.h"
 #include "settings.h"
 #include "snowlogging.h"
 
+#include <core/region.h>
 #include <effect/effect.h>
 
 #include <chrono>
@@ -214,6 +216,33 @@ private:
     KWin::LogicalOutput *m_paintedOutput = nullptr;
     /** Whether the ground's Cap still has to go down in this frame. */
     bool m_groundCapPending = false;
+    /**
+     * How many windows this frame was marked translucent, and whether the
+     * ground's Cap was drawn -- for the probe alone.
+     *
+     * Marking a window translucent takes it out of the occluders, so what it
+     * covers is painted rather than culled. That is the one thing this effect
+     * changes about a frame that no repaint region records, which is exactly
+     * why it is worth counting when a frame costs more than it should.
+     */
+    int m_translucentWindows = 0;
+    bool m_groundCapDrawn = false;
+    /**
+     * What the frame being painted may put on screen, for the Caps drawn from
+     * inside paintWindow. Everything this effect draws is clipped to it; see
+     * paintRegion() and FlakePainter's scissor for what happens otherwise.
+     */
+    KWin::Region m_paintedRegion;
+
+    /**
+     * Per-frame timing, for hitches nothing in here accounts for.
+     *
+     * Inert unless `KWIN_SNOW_PROBE` is set in the compositor's environment, so
+     * it is a member rather than something switched in: the cost of carrying it
+     * is a bool test per frame, and the cost of not carrying it is a rebuild
+     * every time the snow stalls on somebody's desktop.
+     */
+    FrameProbe m_probe;
 };
 
 } // namespace Snow

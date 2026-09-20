@@ -12,6 +12,7 @@
 #include <QVector2D>
 #include <QVector4D>
 
+#include <core/region.h>
 #include <core/rendertarget.h>
 #include <core/renderviewport.h>
 #include <effect/effecthandler.h>
@@ -122,9 +123,17 @@ static int planeOf(const Flake &flake, int planes)
 }
 
 void FlakePainter::paint(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
-                         const QList<Flake> &flakes, FlakeStyle style)
+                         const QList<Flake> &flakes, FlakeStyle style, const KWin::Region &deviceRegion)
 {
     if (flakes.isEmpty() || !KWin::effects->isOpenGLCompositing()) {
+        return;
+    }
+
+    // Nothing is being repainted, so nothing of this can reach the screen: the
+    // scissored draw below over an empty region emits nothing whatever is in
+    // the buffer. Said here rather than left to that, so the vertices are not
+    // built to be thrown away.
+    if (deviceRegion.isEmpty()) {
         return;
     }
 
@@ -132,6 +141,20 @@ void FlakePainter::paint(const KWin::RenderTarget &renderTarget, const KWin::Ren
     if (!texture) {
         return;
     }
+
+    // A cheap first cut at the region below, in the flakes' own global logical
+    // pixels: the bounding rect of what is being repainted, grown by more than
+    // the largest sprite's own half extent (spriteFor's `s_blobSpan` over the
+    // widest radius is a couple of dozen logical pixels) so a Flake just
+    // outside it is not dropped where its own sprite would still have reached
+    // in. The scissor below is what actually clips; this only keeps the
+    // vertices of a population that is nowhere near the region from being
+    // built at all, which is most of them on the small repaints something else
+    // asks for.
+    static constexpr qreal s_clipMargin = 32;
+    const KWin::RectF logicalClip =
+        viewport.mapFromDeviceCoordinates(KWin::RectF(deviceRegion.boundingRect()))
+            .marginsAdded(QMarginsF(s_clipMargin, s_clipMargin, s_clipMargin, s_clipMargin));
 
     // An image uploaded into a texture arrives upside down, so the corners of
     // the sprite come from the texture's own matrix rather than from 0 and 1.
@@ -149,6 +172,14 @@ void FlakePainter::paint(const KWin::RenderTarget &renderTarget, const KWin::Ren
     const qreal scale = viewport.scale();
     const int planes = style == FlakeStyle::Depth ? s_depthPlanes : 1;
 
+    // A Flake outside the region actually being repainted this pass is exactly
+    // as invisible as a covered one: nothing under it will show it, whether
+    // that is because a window is drawn over it or because nothing here is
+    // touching that pixel at all.
+    const auto visible = [&](const Flake &flake) {
+        return logicalClip.contains(flake.x, flake.y);
+    };
+
     // The whole population goes into one buffer, a plane at a time, so that the
     // planes are ranges of a single upload rather than eight of their own. That
     // takes knowing how long each of them is before anything is written, which
@@ -157,7 +188,7 @@ void FlakePainter::paint(const KWin::RenderTarget &renderTarget, const KWin::Ren
     // both passes, so it costs no vertices rather than invisible ones.
     std::array<int, s_depthPlanes> planeCount{};
     for (const Flake &flake : flakes) {
-        if (flake.covered) {
+        if (flake.covered || !visible(flake)) {
             continue;
         }
         ++planeCount[planeOf(flake, planes)];
@@ -176,7 +207,7 @@ void FlakePainter::paint(const KWin::RenderTarget &renderTarget, const KWin::Ren
     KWin::GLVertex2D *const vertices = m_vertices.data();
 
     for (const Flake &flake : flakes) {
-        if (flake.covered) {
+        if (flake.covered || !visible(flake)) {
             continue;
         }
 
@@ -201,6 +232,24 @@ void FlakePainter::paint(const KWin::RenderTarget &renderTarget, const KWin::Ren
     // four channels alike leaves them premultiplied.
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+    // KWin leaves the scissor to whoever is drawing ("It's within the caller's
+    // responsibility to enable GL_SCISSOR_TEST" -- GLVertexBuffer::render), so
+    // without this the snow goes down over the whole output on every frame,
+    // including the frames that repaint a corner of it.
+    //
+    // That is not merely wasteful, it is the bug it looks like. KWin renders
+    // into a buffer it has used before and repaints only what has changed
+    // since that buffer was last shown; the rest of it is already right and is
+    // left alone. Outside the region, "already right" includes the snow --
+    // which is why a frame the snow does not move in can leave it there
+    // (ADR-0005) -- and drawing it again lands a second premultiplied `over`
+    // on top of the first. One flake blended twice is a brighter flake, and it
+    // stays brighter until the next frame that repaints the whole output puts
+    // it back. Nothing showed while the only frames between two of the
+    // effect's own were the occasional small ones; a pointer KWin draws
+    // oversized while it is moved quickly asks for them by the hundred.
+    glEnable(GL_SCISSOR_TEST);
     texture->bind();
 
     // One upload for the whole population, and then a draw over each plane's
@@ -223,13 +272,16 @@ void FlakePainter::paint(const KWin::RenderTarget &renderTarget, const KWin::Ren
         shader->setUniform(KWin::GLShader::Vec4Uniform::ModulationConstant,
                            QVector4D(opacity, opacity, opacity, opacity));
 
-        // No region: the effect asks for a full repaint every frame, because
-        // falling snow is damage nothing else reports.
-        vbo->draw(GL_TRIANGLES, planeFirst[plane], planeCount[plane] * s_verticesPerFlake);
+        // A scissor rect and a draw per rect of the region, which is what the
+        // `true` asks for. One rect on a frame the effect asked for itself,
+        // because that one repaints the whole output.
+        vbo->draw(deviceRegion, GL_TRIANGLES, planeFirst[plane],
+                  planeCount[plane] * s_verticesPerFlake, true);
     }
 
     vbo->unbindArrays();
     texture->unbind();
+    glDisable(GL_SCISSOR_TEST);
     glDisable(GL_BLEND);
     manager->popShader();
 }

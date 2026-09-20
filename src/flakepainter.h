@@ -20,6 +20,7 @@ struct GLVertex2D;
 namespace KWin
 {
 class GLTexture;
+class Region;
 class RenderTarget;
 class RenderViewport;
 }
@@ -60,11 +61,17 @@ public:
      * @a flakes are in global logical pixels, the coordinates the whole model
      * works in (ADR-0001); @a viewport is what turns them into the device
      * pixels the output is actually rendered at.
+     *
+     * @a deviceRegion is what KWin is repainting this pass, in device pixels,
+     * and the Flakes are scissored to it. Not an optimisation: outside it the
+     * buffer already holds this same snow, and drawing over it again blends it
+     * on top of itself. See paint() for what that looks like.
      */
     void paint(const KWin::RenderTarget &renderTarget,
                const KWin::RenderViewport &viewport,
                const QList<Flake> &flakes,
-               FlakeStyle style);
+               FlakeStyle style,
+               const KWin::Region &deviceRegion);
 
 private:
     /** A sprite texture, and whether making it has already been tried. */

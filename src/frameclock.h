@@ -89,8 +89,12 @@ public:
     bool isDue(KWin::LogicalOutput *output, FramePacer::Clock::time_point now);
 
     /**
-     * Report that a frame of @a output has been rendered, which is what decides
-     * when the next one is asked for.
+     * Report that a frame of @a output has been rendered at @a now, which is
+     * what decides when the next one is asked for.
+     *
+     * FramePacer::spendOn() advances the schedule against the moment isDue()
+     * was asked; see Schedule. arm() then asks waitUntilDue() of every output
+     * from @a now, when waiting starts, to find the next frame to ask for.
      *
      * Every frame reports, not only the ones this clock asked for: a desktop
      * painting faster than the cap for its own reasons is one the snow rides
@@ -113,6 +117,22 @@ private:
         FramePacer pacer;
         bool claimable = false;
         bool animating = false;
+        /**
+         * The moment isDue() was asked, which is the moment the frame is about.
+         *
+         * Kept because postPaint happens a few milliseconds after prePaint, and
+         * FramePacer::spendOn() asks whether the frame was due as well as
+         * being told whether the snow moved in it. Asked again at postPaint it
+         * can answer yes about a frame that answered no at prePaint -- a
+         * schedule that came due while the frame was being rendered -- and then
+         * the schedule is spent on a frame the snow stood still in. Since it
+         * advances by a whole number of refresh periods, the next due moment
+         * lands in the render window of the frame two later and does it again:
+         * the animation locks out until something shifts the phase. Measured at
+         * a step every 33 ms or one every 30 seconds depending on nothing but
+         * where the phase happened to start.
+         */
+        FramePacer::Clock::time_point decided{};
     };
 
     void addOutput(KWin::LogicalOutput *output);

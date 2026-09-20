@@ -14,6 +14,7 @@
 #include <QVector2D>
 #include <QVector4D>
 
+#include <core/region.h>
 #include <core/rendertarget.h>
 #include <core/renderviewport.h>
 #include <effect/effecthandler.h>
@@ -67,9 +68,17 @@ KWin::GLTexture *CapPainter::profileTexture()
 
 void CapPainter::paint(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
                        const QMatrix4x4 &modelViewProjection, const Catcher &catcher,
-                       const Settings &settings, qreal opacity)
+                       const Settings &settings, qreal opacity, const KWin::Region &deviceRegion)
 {
     if (!KWin::effects->isOpenGLCompositing() || opacity <= 0) {
+        return;
+    }
+
+    // Nothing is being repainted, so nothing of this band can reach the screen:
+    // the scissored render below over an empty region emits nothing whatever is
+    // in the buffer. Said here rather than left to that, so the Cap's vertices
+    // are not built to be thrown away.
+    if (deviceRegion.isEmpty()) {
         return;
     }
 
@@ -182,16 +191,18 @@ void CapPainter::paint(const KWin::RenderTarget &renderTarget, const KWin::Rende
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    // Clipped to what is being repainted, or a Cap standing in a part of the
+    // buffer that already holds it is blended over itself; see FlakePainter.
+    glEnable(GL_SCISSOR_TEST);
     texture->bind();
 
     KWin::GLVertexBuffer *vbo = KWin::GLVertexBuffer::streamingBuffer();
     vbo->reset();
     vbo->setVertices(m_vertices);
-    // No region: the effect asks for a full repaint every frame, because
-    // falling snow is damage nothing else reports.
-    vbo->render(GL_TRIANGLES);
+    vbo->render(deviceRegion, GL_TRIANGLES, true);
 
     texture->unbind();
+    glDisable(GL_SCISSOR_TEST);
     glDisable(GL_BLEND);
     manager->popShader();
 }

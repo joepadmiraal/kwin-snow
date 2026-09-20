@@ -136,13 +136,16 @@ public:
     /**
      * How long from @a now until the next frame is due, without moving the
      * schedule; zero when it is due already.
+     *
+     * After spendOn(), zero means a compositor that cannot keep up with the
+     * cap: the pacing never asks for more than one frame at a time, so a slow
+     * compositor simply animates slower rather than catching up missed frames.
      */
     std::chrono::milliseconds waitUntilDue(Clock::time_point now) const;
 
     /**
-     * How long to wait before asking for the next frame, given that one has
-     * just been rendered at @a now, and that the snow did or did not move in it
-     * (@a animated).
+     * Spend the schedule on the frame decided at @a decided, in which the snow
+     * did or did not move (@a animated).
      *
      * The schedule advances for a frame that was due, and for one the snow
      * moved in whether it was due or not -- which is the frame FrameClock hands
@@ -151,11 +154,16 @@ public:
      * leave the next frame due immediately and the snow stepping twice in a
      * refresh period.
      *
-     * Zero when the next frame is already due, which is a compositor that
-     * cannot keep up with the cap: the pacing never asks for more than one
-     * frame at a time, so a slow compositor simply animates slower.
+     * The timestamp is the prePaint decision, never the end of rendering: a
+     * schedule that comes due during rendering must not be spent on a frame
+     * the snow stood still in. Ask waitUntilDue() separately when waiting starts.
+     *
+     * Keep that moment explicit rather than remembering it in isDue():
+     * FrameClock short-circuits `claimed || pacer.isDue(now)`, so a claimed
+     * frame never asks the pacer and would leave a remembered moment stale.
+     * isDue() stays a pure query, with no hidden state changed by asking it.
      */
-    std::chrono::milliseconds waitAfterFrame(Clock::time_point now, bool animated = false);
+    void spendOn(Clock::time_point decided, bool animated = false);
 
 private:
     /**

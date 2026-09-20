@@ -123,6 +123,10 @@ bool FrameClock::isDue(KWin::LogicalOutput *output, FramePacer::Clock::time_poin
     }
 
     Schedule &schedule = it->second;
+    // This is the moment the frame is about, and postPaint must not re-ask the
+    // question against a later one (Schedule::decided).
+    schedule.decided = now;
+
     // The claim is spent whether or not the schedule needed it: one repaint
     // request is worth one frame per output, and a second frame arriving before
     // the next request is somebody else's.
@@ -147,7 +151,7 @@ void FrameClock::frameRendered(KWin::LogicalOutput *output, FramePacer::Clock::t
     // when it was the claim rather than the schedule that handed it over --
     // otherwise the next frame is due at once and the snow steps twice inside
     // one refresh period.
-    schedule.pacer.waitAfterFrame(now, std::exchange(schedule.animating, false));
+    schedule.pacer.spendOn(schedule.decided, std::exchange(schedule.animating, false));
     arm(now);
 }
 

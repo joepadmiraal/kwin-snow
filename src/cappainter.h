@@ -17,6 +17,7 @@ class QMatrix4x4;
 namespace KWin
 {
 class GLTexture;
+class Region;
 class RenderTarget;
 class RenderViewport;
 struct GLVertex2D;
@@ -60,13 +61,18 @@ public:
      * follows its Catcher through whatever effect below is moving it; for the
      * ground it is the projection alone, because the ground belongs to the
      * output rather than to the wallpaper it is drawn over.
+     *
+     * @a deviceRegion is what KWin is repainting this pass, and the Cap is
+     * clipped to it for the same reason the Flakes are -- see FlakePainter's
+     * scissor.
      */
     void paint(const KWin::RenderTarget &renderTarget,
                const KWin::RenderViewport &viewport,
                const QMatrix4x4 &modelViewProjection,
                const Catcher &catcher,
                const Settings &settings,
-               qreal opacity);
+               qreal opacity,
+               const KWin::Region &deviceRegion);
 
 private:
     /**

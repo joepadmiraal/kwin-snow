@@ -47,6 +47,7 @@ private Q_SLOTS:
     void aLateFrameWaitsLessSoTheRateHolds();
     void aRunOfLateFramesDoesNotDriftOffTheCap();
     void aFasterDesktopIsNotAskedForFrames();
+    void aFrameThatWasNotDueDoesNotSpendTheSchedule();
     void aFrameIsDueOnlyWhenTheScheduleSaysSo();
     void askingHowLongDoesNotMoveTheSchedule();
     void theSameInstantTwiceIsStillOneFrame();
@@ -126,9 +127,11 @@ void FramePacerTest::aFrameOnScheduleWaitsAWholeInterval()
     pacer.restart(start);
 
     // The frame the resume asked for, arriving promptly.
-    QCOMPARE(pacer.waitAfterFrame(start + 2ms), s_frame - 2ms);
+    pacer.spendOn(start + 2ms);
+    QCOMPARE(pacer.waitUntilDue(start + 2ms), s_frame - 2ms);
     // And the next, arriving when it was due.
-    QCOMPARE(pacer.waitAfterFrame(start + s_frame), s_frame);
+    pacer.spendOn(start + s_frame);
+    QCOMPARE(pacer.waitUntilDue(start + s_frame), s_frame);
 }
 
 void FramePacerTest::aLateFrameWaitsLessSoTheRateHolds()
@@ -136,12 +139,13 @@ void FramePacerTest::aLateFrameWaitsLessSoTheRateHolds()
     const FramePacer::Clock::time_point start{};
     FramePacer pacer(30);
     pacer.restart(start);
-    pacer.waitAfterFrame(start);
+    pacer.spendOn(start);
 
     // A frame that missed its refresh period and came half an interval late:
     // the wait that follows is short by exactly that, so the frame after it is
     // back on the schedule the cap set rather than a whole period behind it.
-    QCOMPARE(pacer.waitAfterFrame(start + s_frame + 16ms), s_frame - 16ms);
+    pacer.spendOn(start + s_frame + 16ms);
+    QCOMPARE(pacer.waitUntilDue(start + s_frame + 16ms), s_frame - 16ms);
 }
 
 void FramePacerTest::aRunOfLateFramesDoesNotDriftOffTheCap()
@@ -156,7 +160,8 @@ void FramePacerTest::aRunOfLateFramesDoesNotDriftOffTheCap()
     // the difference plain.
     FramePacer::Clock::time_point now = start;
     for (int frame = 0; frame < 30; ++frame) {
-        now += pacer.waitAfterFrame(now) + 5ms;
+        pacer.spendOn(now);
+        now += pacer.waitUntilDue(now) + 5ms;
     }
 
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
@@ -167,21 +172,50 @@ void FramePacerTest::aRunOfLateFramesDoesNotDriftOffTheCap()
     QVERIFY(elapsed >= thirtyFrames - 1ms);
 }
 
+void FramePacerTest::aFrameThatWasNotDueDoesNotSpendTheSchedule()
+{
+    const FramePacer::Clock::time_point start{};
+    FramePacer pacer(30);
+    pacer.restart(start);
+    pacer.spendOn(start);
+
+    // Somebody else's frame, settled 3 ms before the schedule comes due: the
+    // snow does not move in it, and the schedule must still be waiting for the
+    // frame it was saving itself for.
+    const FramePacer::Clock::time_point decided = start + s_frame - 3ms;
+    QVERIFY(!pacer.isDue(decided));
+    pacer.spendOn(decided, false);
+
+    // Rendering that frame took a few milliseconds, and the schedule came due
+    // somewhere inside them. Reporting it against *that* moment instead is what
+    // spends the schedule on a frame the snow stood still in -- and because the
+    // schedule then advances by a whole interval, the next due moment lands
+    // inside the next such frame and it happens again, for as long as the phase
+    // holds. This is the shape of that: the frame the snow should have moved in
+    // is still there to be moved in.
+    QVERIFY(pacer.isDue(start + s_frame));
+    pacer.spendOn(start + s_frame, true);
+    QCOMPARE(pacer.waitUntilDue(start + s_frame), s_frame);
+}
+
 void FramePacerTest::aFasterDesktopIsNotAskedForFrames()
 {
     const FramePacer::Clock::time_point start{};
     FramePacer pacer(30);
     pacer.restart(start);
-    pacer.waitAfterFrame(start);
+    pacer.spendOn(start);
 
     // Frames arriving at 60 fps because something else is painting the desktop.
     // Each one is answered with the time still left on the schedule rather than
     // an interval of its own, so the effect asks for nothing until they stop.
-    QCOMPARE(pacer.waitAfterFrame(start + 17ms), s_frame - 17ms);
-    QCOMPARE(pacer.waitAfterFrame(start + 25ms), s_frame - 25ms);
+    pacer.spendOn(start + 17ms);
+    QCOMPARE(pacer.waitUntilDue(start + 17ms), s_frame - 17ms);
+    pacer.spendOn(start + 25ms);
+    QCOMPARE(pacer.waitUntilDue(start + 25ms), s_frame - 25ms);
 
     // And when they do stop, the next frame is the one the cap wanted all along.
-    QCOMPARE(pacer.waitAfterFrame(start + s_frame), s_frame);
+    pacer.spendOn(start + s_frame);
+    QCOMPARE(pacer.waitUntilDue(start + s_frame), s_frame);
 }
 
 void FramePacerTest::aFrameIsDueOnlyWhenTheScheduleSaysSo()
@@ -192,7 +226,7 @@ void FramePacerTest::aFrameIsDueOnlyWhenTheScheduleSaysSo()
 
     // A resume is due at once, and the frame it asks for answers it.
     QVERIFY(pacer.isDue(start));
-    pacer.waitAfterFrame(start);
+    pacer.spendOn(start);
 
     // The frames in between belong to whatever else is painting the desktop.
     // Saying no to those is what keeps the snow out of a frame that repaints
@@ -214,7 +248,7 @@ void FramePacerTest::aFrameAHairEarlyIsStillThatFrame()
     const FramePacer::Clock::time_point start{};
     FramePacer pacer(60);
     pacer.restart(start);
-    pacer.waitAfterFrame(start);
+    pacer.spendOn(start);
 
     // The moment a frame is measured at is when the compositor began preparing
     // it, which sits a variable few hundred microseconds ahead of the refresh
@@ -234,7 +268,7 @@ void FramePacerTest::aClaimedFrameSpendsTheScheduleToo()
     const FramePacer::Clock::time_point start{};
     FramePacer pacer(30);
     pacer.restart(start);
-    pacer.waitAfterFrame(start);
+    pacer.spendOn(start);
 
     // FrameClock hands the snow a frame that its own repaint request brought
     // back even when the schedule has not reached it. The schedule still has to
@@ -242,7 +276,8 @@ void FramePacerTest::aClaimedFrameSpendsTheScheduleToo()
     // later would be due as well, and the snow would step twice inside one
     // refresh period.
     QCOMPARE(pacer.waitUntilDue(start + 20ms), 13ms);
-    QCOMPARE(pacer.waitAfterFrame(start + 20ms, true), 46ms);
+    pacer.spendOn(start + 20ms, true);
+    QCOMPARE(pacer.waitUntilDue(start + 20ms), 46ms);
     QVERIFY(!pacer.isDue(start + 33ms));
 
     // And the phase is the schedule's own rather than the early frame's: two
@@ -255,7 +290,7 @@ void FramePacerTest::askingHowLongDoesNotMoveTheSchedule()
     const FramePacer::Clock::time_point start{};
     FramePacer pacer(30);
     pacer.restart(start);
-    pacer.waitAfterFrame(start);
+    pacer.spendOn(start);
 
     // FrameClock asks every output's schedule how long it has left, every time
     // it arms its one timer, and asking must cost nothing: the answer is the
@@ -263,7 +298,8 @@ void FramePacerTest::askingHowLongDoesNotMoveTheSchedule()
     // measured against the schedule it would have been.
     QCOMPARE(pacer.waitUntilDue(start + 10ms), s_frame - 10ms);
     QCOMPARE(pacer.waitUntilDue(start + 10ms), s_frame - 10ms);
-    QCOMPARE(pacer.waitAfterFrame(start + s_frame), s_frame);
+    pacer.spendOn(start + s_frame);
+    QCOMPARE(pacer.waitUntilDue(start + s_frame), s_frame);
 
     // Overdue is nothing to wait for rather than a negative wait, which a timer
     // cannot take.
@@ -279,9 +315,12 @@ void FramePacerTest::theSameInstantTwiceIsStillOneFrame()
     // A schedule belongs to one output, so the frames it is told about are that
     // output's alone; the second report of the same instant must not spend an
     // interval of its own.
-    QCOMPARE(pacer.waitAfterFrame(start), s_frame);
-    QCOMPARE(pacer.waitAfterFrame(start), s_frame);
-    QCOMPARE(pacer.waitAfterFrame(start + s_frame), s_frame);
+    pacer.spendOn(start);
+    QCOMPARE(pacer.waitUntilDue(start), s_frame);
+    pacer.spendOn(start);
+    QCOMPARE(pacer.waitUntilDue(start), s_frame);
+    pacer.spendOn(start + s_frame);
+    QCOMPARE(pacer.waitUntilDue(start + s_frame), s_frame);
 }
 
 void FramePacerTest::aStallIsNotCaughtUpOn()
@@ -289,13 +328,15 @@ void FramePacerTest::aStallIsNotCaughtUpOn()
     const FramePacer::Clock::time_point start{};
     FramePacer pacer(30);
     pacer.restart(start);
-    pacer.waitAfterFrame(start);
+    pacer.spendOn(start);
 
     // A second with no frames at all: something else had the compositor. The
     // frames that were missed are not owed -- the next one is due now, and the
     // one after it a whole interval later.
-    QCOMPARE(pacer.waitAfterFrame(start + 1000ms), 0ms);
-    QCOMPARE(pacer.waitAfterFrame(start + 1000ms), s_frame);
+    pacer.spendOn(start + 1000ms);
+    QCOMPARE(pacer.waitUntilDue(start + 1000ms), 0ms);
+    pacer.spendOn(start + 1000ms);
+    QCOMPARE(pacer.waitUntilDue(start + 1000ms), s_frame);
 }
 
 void FramePacerTest::aResumeAsksStraightAway()
@@ -306,10 +347,12 @@ void FramePacerTest::aResumeAsksStraightAway()
 
     // A resume has nothing to be on schedule with: the snow has not been
     // animating, and the frame it starts again from is due at once.
-    QCOMPARE(pacer.waitAfterFrame(start), s_frame);
+    pacer.spendOn(start);
+    QCOMPARE(pacer.waitUntilDue(start), s_frame);
 
     pacer.restart(start + 5s);
-    QCOMPARE(pacer.waitAfterFrame(start + 5s), s_frame);
+    pacer.spendOn(start + 5s);
+    QCOMPARE(pacer.waitUntilDue(start + 5s), s_frame);
 }
 
 QTEST_GUILESS_MAIN(FramePacerTest)

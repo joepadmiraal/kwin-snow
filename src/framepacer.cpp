@@ -95,24 +95,25 @@ std::chrono::milliseconds FramePacer::waitUntilDue(Clock::time_point now) const
     return std::chrono::floor<std::chrono::milliseconds>(m_due - now);
 }
 
-std::chrono::milliseconds FramePacer::waitAfterFrame(Clock::time_point now, bool animated)
+void FramePacer::spendOn(Clock::time_point decided, bool animated)
 {
-    if (animated || isDue(now)) {
-        // The frame that was due has arrived, so the next one is due an interval
-        // after that -- not an interval after this moment, which is what lets a
-        // frame that came late be followed by a shorter wait.
-        //
-        // A schedule that has fallen behind altogether is moved up to now
-        // instead: the compositor stalled, or several frames were missed, and
-        // none of them is worth rendering late.
-        m_due = std::max(m_due + m_interval, now);
+    if (!animated && !isDue(decided)) {
+        // Still in the future: something else is painting the desktop faster
+        // than the cap -- a video, a window being dragged -- and this frame is
+        // one of theirs. The schedule is left where it is, so the cap goes on
+        // deciding when the snow next moves rather than being reset by every
+        // frame that goes past.
+        return;
     }
 
-    // Still in the future: something else is painting the desktop faster than
-    // the cap -- a video, a window being dragged -- and this frame is one of
-    // theirs. The schedule is left where it is, so the cap goes on deciding when
-    // the snow next moves rather than being reset by every frame that goes past.
-    return waitUntilDue(now);
+    // The frame that was due has arrived, so the next one is due an interval
+    // after that -- not an interval after this moment, which is what lets a
+    // frame that came late be followed by a shorter wait.
+    //
+    // A schedule that has fallen behind altogether is moved up to the decision
+    // instead: the compositor stalled, or several frames were missed, and
+    // none of them is worth rendering late.
+    m_due = std::max(m_due + m_interval, decided);
 }
 
 } // namespace Snow

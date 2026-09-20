@@ -14,6 +14,7 @@ target_sources(snow PRIVATE
     flakesprite.cpp
     frameclock.cpp
     framepacer.cpp
+    frameprobe.cpp
     main.cpp
     settings.cpp
     snoweffect.cpp
