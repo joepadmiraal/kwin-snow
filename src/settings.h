@@ -108,7 +108,7 @@ struct Settings
      * against what is standing rather than against the cap (cap.h:
      * capReferenceDepth).
      */
-    int maxDepth = 20;
+    int maxDepth = 8;
 
     /**
      * How fast every Column decays, in logical pixels per second. 0 means
@@ -132,7 +132,7 @@ struct Settings
      * that has stopped being fed goes, over the minutes rather than the
      * seconds that meltRateFor() below is for.
      */
-    qreal meltRate = 0.05;
+    qreal meltRate = 0.04;
 
     /**
      * How many frames a second the snow is animated at.

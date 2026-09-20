@@ -808,6 +808,7 @@ void SnowfallTest::aConcealedCatcherIsTransparent()
 {
     Settings config = settings();
     config.meltRate = 0;
+    config.maxDepth = 20; // leave headroom to observe catching again after concealment
 
     Catcher ground = theGround();
     Catcher window = wallToWall(500);

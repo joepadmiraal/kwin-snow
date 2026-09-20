@@ -92,7 +92,7 @@
 
     <!-- Logical pixels, never device ones (ADR-0001). -->
     <entry name="maxDepth" type="Int">
-      <default>20</default>
+      <default>8</default>
       <min>1</min>
       <max>200</max>
     </entry>
@@ -101,7 +101,7 @@
          snow arrives at, which is what makes it accumulate at all rather than
          melt as fast as it lands; see Snow::Settings::meltRate. -->
     <entry name="meltRate" type="Double">
-      <default>0.05</default>
+      <default>0.04</default>
       <min>0</min>
       <max>100</max>
     </entry>
