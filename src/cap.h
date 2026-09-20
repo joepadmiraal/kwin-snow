@@ -37,6 +37,7 @@ inline constexpr qreal s_capVisibleDepth = 0.15;
  * The band is drawn from the contour down to a line just inside the Catcher
  * rather than exactly on its top edge, so that there is no hairline of window
  * showing through between the snow and the frame it is standing on.
+ * Limited to the local drawn depth so bare Columns have no underlap.
  */
 inline constexpr qreal s_capUnderlap = 3.0;
 

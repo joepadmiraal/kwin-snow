@@ -20,6 +20,7 @@
 #include <effect/effecthandler.h>
 #include <opengl/glutils.h>
 
+#include <algorithm>
 #include <array>
 
 namespace Snow
@@ -152,24 +153,29 @@ void CapPainter::paint(const KWin::RenderTarget &renderTarget, const KWin::Rende
         }
     };
 
-    // The band, from the contour down to a line just inside the Catcher.
-    const qreal foot = top + s_capUnderlap;
+    // Taper the underlap to zero wherever the contour reaches bare. A fixed
+    // underlap would draw a stripe across the whole Catcher after one landing.
     for (int post = 0; post + 1 < m_posts.size(); ++post) {
         const QPointF &left = m_posts.at(post);
         const QPointF &right = m_posts.at(post + 1);
-        writeQuad(s_capBodyColumn, {left, right, QPointF(right.x(), foot), QPointF(left.x(), foot)});
+        const qreal leftFoot = top + std::min(s_capUnderlap, top - left.y());
+        const qreal rightFoot = top + std::min(s_capUnderlap, top - right.y());
+        writeQuad(s_capBodyColumn, {left, right, QPointF(right.x(), rightFoot), QPointF(left.x(), leftFoot)});
     }
 
     // The bright line along the leading edge, centred on the contour. Only
     // between the Columns themselves: the two closing segments are the ends of
-    // the band, not part of its top.
+    // the band, not part of its top. Its thickness also tapers to zero on bare
+    // Columns, so the highlight cannot leave a line where no snow has landed.
     const qreal half = s_capEdgeWidth / 2;
     for (int post = 1; post + 2 < m_posts.size(); ++post) {
         const QPointF &left = m_posts.at(post);
         const QPointF &right = m_posts.at(post + 1);
+        const qreal leftHalf = std::min(half, top - left.y());
+        const qreal rightHalf = std::min(half, top - right.y());
         writeQuad(s_capEdgeColumn,
-                  {QPointF(left.x(), left.y() - half), QPointF(right.x(), right.y() - half),
-                   QPointF(right.x(), right.y() + half), QPointF(left.x(), left.y() + half)});
+                  {QPointF(left.x(), left.y() - leftHalf), QPointF(right.x(), right.y() - rightHalf),
+                   QPointF(right.x(), right.y() + rightHalf), QPointF(left.x(), left.y() + leftHalf)});
     }
 
     Q_ASSERT(cursor == m_vertices.data() + m_vertices.size());
