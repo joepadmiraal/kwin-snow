@@ -98,12 +98,17 @@ public:
                      int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen) override;
 
     /**
-     * Makes room for the Cap of the window about to be painted.
+     * Stops the window about to be painted from claiming to be opaque up to
+     * its own top edge.
      *
      * A Cap stands above its window's frame geometry, in a strip KWin has no
-     * reason to expect anything in, so the strip is added to what will be
-     * painted and the window stops claiming to be opaque up to its own top edge
-     * (spec: Rendering).
+     * reason to expect anything in (spec: Rendering). Making room for that
+     * strip in what gets *painted* is prePaintScreen()'s job, not this one:
+     * WindowPrePaintData's own hook for it, devicePaint, is not read anywhere
+     * in KWin 6.6.6 (ADR-0005). This still has to run every frame, due or
+     * not, because a window KWin is free to treat as an opaque occluder is one
+     * it can skip repainting what is behind -- the Cap it is about to be asked
+     * to draw over its own top edge included.
      */
     void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data,
                         std::chrono::milliseconds presentTime);
@@ -158,6 +163,19 @@ private:
 
     /** The same question for the ground Catcher of the output being painted. */
     const Catcher *cappedGround() const;
+
+    /**
+     * The strip above every Catcher of @a output that is wearing a Cap right
+     * now, in global logical pixels -- the region prePaintScreen() has to add
+     * to what this frame paints so that a Cap standing above its Catcher's own
+     * geometry is never left to a stale buffer (see prePaintWindow()).
+     *
+     * Walked fresh every frame rather than cached: a Snowline's depth changes
+     * whether or not this frame is due, so a cached headroom would go stale
+     * exactly when a settling pile needs less of it or a growing one needs
+     * more.
+     */
+    KWin::Region capHeadroomRegion(KWin::LogicalOutput *output) const;
 
     /**
      * Start, stop or re-pace the clock the animation runs on.

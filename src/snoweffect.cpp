@@ -137,6 +137,16 @@ void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::mil
         // repaints them. That is the trail a dragged window pulls behind it,
         // and not stepping here is what there is instead of asking for the
         // whole screen to be repainted at somebody else's frame rate.
+        // A Cap can still be standing outside its own Catcher's geometry on a
+        // frame like this: above a Panel's top edge, above the ground's. That
+        // strip is nobody else's to ask for -- it is not inside any window's
+        // own frame, so nothing but this effect knows it has to stay current
+        // -- and skipping it here is what used to leave it to a buffer as old
+        // as the last frame that happened to repaint the whole output. Small
+        // and cheap, unlike the full-output repaint below: this is the one
+        // piece of that repaint a frame like this still owes.
+        data.paint += capHeadroomRegion(data.screen);
+
         chainPrePaintScreen(KWin::effects, data, presentTime);
         return;
     }
@@ -269,6 +279,36 @@ const Catcher *SnowEffect::cappedGround() const
         return nullptr;
     }
     return capIsVisible(ground->snowline()) ? ground : nullptr;
+}
+
+KWin::Region SnowEffect::capHeadroomRegion(KWin::LogicalOutput *output) const
+{
+    KWin::Region region;
+
+    for (const Catcher *catcher : m_catchers->catchersFor(output)) {
+        // The same two questions cappedCatcher() and cappedGround() ask of a
+        // window at paint time, asked here of every Catcher on the output
+        // instead: an auto-hidden Panel or a bare Snowline draws no Cap, so
+        // there is no strip above it to protect.
+        if (catcher->window() && catcher->window()->isHidden()) {
+            continue;
+        }
+        const Snowline &snowline = catcher->snowline();
+        if (!capIsVisible(snowline)) {
+            continue;
+        }
+
+        // Against the depth the Cap is actually drawn to, which can run ahead
+        // of `maxDepth` for a few seconds after it is lowered (capReferenceDepth)
+        // -- the same depth CapPainter shades against, so the strip this reaches
+        // is never shorter than the Cap actually drawn inside it.
+        const qreal headroom = capHeadroom(capReferenceDepth(snowline, m_settings.maxDepth));
+        const QRectF geometry = catcher->geometry();
+        const QRectF strip(geometry.left(), geometry.top() - headroom, geometry.width(), headroom);
+        region += KWin::Rect(strip.toAlignedRect());
+    }
+
+    return region;
 }
 
 void SnowEffect::postPaintScreen()
