@@ -43,9 +43,14 @@ On Fedora KDE, install the `.rpm` with `dnf` (or open it in Discover):
 sudo dnf install ./kwin-effect-snow-*.rpm
 ```
 
-On Arch Linux, build and install the recipe with `makepkg -si` from
-`packaging/arch`. For unsupported or newer distributions, [build from
-source](#build-and-test) against that distribution's `kwin-dev` package.
+On Arch Linux, install the `.pkg.tar.zst` with `pacman`:
+
+```sh
+sudo pacman -U kwin-effect-snow-*.pkg.tar.zst
+```
+
+For unsupported or newer distributions, [build from source](#build-and-test)
+against that distribution's `kwin-dev` package.
 
 After installation, enable Snow under **System Settings → Desktop Effects →
 Appearance**. KWin may need to be restarted, or you may need to log out and
