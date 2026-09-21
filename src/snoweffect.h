@@ -85,8 +85,13 @@ public:
      */
     // KWin 6.6 passes presentTime; newer KWin releases do not. Keep both
     // overloads so the effect builds against either API generation.
-    void prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::milliseconds presentTime);
+#ifdef SNOW_KWIN_PREPAINT_HAS_PRESENT_TIME
+    void prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::milliseconds presentTime) override;
     void prePaintScreen(KWin::ScreenPrePaintData &data);
+#else
+    void prePaintScreen(KWin::ScreenPrePaintData &data, std::chrono::milliseconds presentTime);
+    void prePaintScreen(KWin::ScreenPrePaintData &data) override;
+#endif
 
     /**
      * Draws the Flakes of the output being painted, over everything else.
@@ -112,9 +117,16 @@ public:
      * it can skip repainting what is behind -- the Cap it is about to be asked
      * to draw over its own top edge included.
      */
+#ifdef SNOW_KWIN_PREPAINT_HAS_PRESENT_TIME
+    void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data,
+                        std::chrono::milliseconds presentTime) override;
+    void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data);
+#else
     void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data,
                         std::chrono::milliseconds presentTime);
-    void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, KWin::WindowPrePaintData &data);
+    void prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w,
+                        KWin::WindowPrePaintData &data) override;
+#endif
 
     /**
      * Draws the Cap of the window being painted, over the window itself.

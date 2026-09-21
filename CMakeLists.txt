@@ -82,6 +82,13 @@ set(SNOW_CONFIG_INSTALL_DIR "${SNOW_QT_PLUGIN_DIR}/kwin/effects/configs")
 
 add_subdirectory(src)
 
+# KWin 6.7 removed presentTime from the pre-paint virtuals. Tell the effect
+# which overload is the actual virtual for this build so it can mark that one
+# override while keeping source compatibility with both API generations.
+if(KWin_VERSION VERSION_LESS 6.7.0)
+    target_compile_definitions(snow PRIVATE SNOW_KWIN_PREPAINT_HAS_PRESENT_TIME)
+endif()
+
 # CTest defines BUILD_TESTING, defaulting to ON. Qt6::Test is only looked for
 # when it is actually going to be used, so building the effect never needs it.
 include(CTest)
