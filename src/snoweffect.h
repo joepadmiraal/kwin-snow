@@ -101,7 +101,7 @@ public:
      * which is the same point in the frame; it is here because this is the call
      * KWin hands a render target and a viewport to.
      */
-    void paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
+    bool paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
                      int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen) override;
 
     /**
@@ -137,7 +137,7 @@ public:
      * The ground's Cap is drawn here too, just after the wallpaper, which is
      * the one point in a frame that is over the desktop and under every window.
      */
-    void paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
+    bool paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
                      KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion,
                      KWin::WindowPaintData &data) override;
 
