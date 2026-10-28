@@ -220,7 +220,7 @@ void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data)
     prePaintScreen(data, monotonicMilliseconds());
 }
 
-void SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
+bool SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
                              int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen)
 {
     // The ground Catcher is per output, and its Cap goes down in paintWindow,
@@ -241,15 +241,25 @@ void SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin:
     // enabled Catcher class is Solid, so no Flake is ever behind a window to
     // begin with (ADR-0003). The Caps are drawn from inside this call, each in
     // its own Catcher's pass.
-    KWin::effects->paintScreen(renderTarget, viewport, mask, deviceRegion, screen);
+    //
+    // KWin 6.8 marks paintScreen() [[nodiscard]] and uses the return value to
+    // detect GPU resets: if a downstream effect reports failure the frame is
+    // being discarded and drawing into it would be wasted work (and might leave
+    // GL state dirty).  Check the return value before continuing.
+    const bool ret = KWin::effects->paintScreen(renderTarget, viewport, mask, deviceRegion, screen);
+    if (!ret) {
+        return false;
+    }
 
     // The Flakes of this output and no others. A Flake belongs to one Snowfall
     // for the whole of its life and never crosses to another (spec: Rendering),
     // so there is nothing here to clip by output.
     if (Snowfall *snowfall = m_snowfalls->snowfallFor(screen)) {
         m_flakePainter->paint(renderTarget, viewport, snowfall->flakes(),
-                              m_settings.flakeStyle, m_paintedRegion);
+                              m_settings.flakeStyle, deviceRegion);
     }
+
+    return true;
 }
 
 void SnowEffect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w,
@@ -274,11 +284,14 @@ void SnowEffect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, K
     prePaintWindow(view, w, data, monotonicMilliseconds());
 }
 
-void SnowEffect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
+bool SnowEffect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
                              KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion,
                              KWin::WindowPaintData &data)
 {
-    KWin::effects->paintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+    const bool ret = KWin::effects->paintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+    if (!ret) {
+        return false;
+    }
 
     // The ground's Cap lies on the desktop: over the wallpaper and under every
     // window. The wallpaper is itself a window -- plasmashell's desktop window,
@@ -304,6 +317,8 @@ void SnowEffect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin:
                             viewport.projectionMatrix() * data.toMatrix(viewport.scale()),
                             *catcher, m_settings, data.opacity(), m_paintedRegion);
     }
+
+    return true;
 }
 
 const Catcher *SnowEffect::cappedCatcher(KWin::EffectWindow *window) const
