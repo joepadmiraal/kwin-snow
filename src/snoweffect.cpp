@@ -220,7 +220,7 @@ void SnowEffect::prePaintScreen(KWin::ScreenPrePaintData &data)
     prePaintScreen(data, monotonicMilliseconds());
 }
 
-void SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
+bool SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
                              int mask, const KWin::Region &deviceRegion, KWin::LogicalOutput *screen)
 {
     // The ground Catcher is per output, and its Cap goes down in paintWindow,
@@ -250,6 +250,7 @@ void SnowEffect::paintScreen(const KWin::RenderTarget &renderTarget, const KWin:
         m_flakePainter->paint(renderTarget, viewport, snowfall->flakes(),
                               m_settings.flakeStyle, m_paintedRegion);
     }
+    return true;
 }
 
 void SnowEffect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w,
@@ -274,7 +275,7 @@ void SnowEffect::prePaintWindow(KWin::RenderView *view, KWin::EffectWindow *w, K
     prePaintWindow(view, w, data, monotonicMilliseconds());
 }
 
-void SnowEffect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
+bool SnowEffect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin::RenderViewport &viewport,
                              KWin::EffectWindow *w, int mask, const KWin::Region &deviceRegion,
                              KWin::WindowPaintData &data)
 {
@@ -304,6 +305,7 @@ void SnowEffect::paintWindow(const KWin::RenderTarget &renderTarget, const KWin:
                             viewport.projectionMatrix() * data.toMatrix(viewport.scale()),
                             *catcher, m_settings, data.opacity(), m_paintedRegion);
     }
+    return true;
 }
 
 const Catcher *SnowEffect::cappedCatcher(KWin::EffectWindow *window) const
